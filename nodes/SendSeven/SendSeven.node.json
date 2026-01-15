@@ -1,0 +1,22 @@
+{
+  "node": "n8n-nodes-base.sendSeven",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Communication", "Marketing & Content"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://sendseven.com/docs/api/authentication"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://sendseven.com/docs/integrations/n8n"
+      }
+    ]
+  },
+  "alias": ["messaging", "whatsapp", "telegram", "sms", "email", "chat", "omnichannel"],
+  "subcategories": {
+    "Communication": ["SMS & Messaging"]
+  }
+}
