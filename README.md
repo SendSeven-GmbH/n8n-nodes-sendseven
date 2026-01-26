@@ -88,14 +88,14 @@ Different operations require different scopes:
 
 | Operation | Required Scopes |
 |-----------|-----------------|
-| Send Message | `messages:send` |
+| Send Message | `messages:create` |
 | Read Messages | `messages:read` |
-| Create/Update Contact | `contacts:create`, `contacts:write` |
+| Create/Update Contact | `contacts:create`, `contacts:update` |
 | Read Contacts | `contacts:read` |
-| Manage Tags | `tags:read`, `tags:write` |
+| Manage Tags | `tags:read`, `tags:update` |
 | Read Conversations | `conversations:read` |
-| Manage Conversations | `conversations:write` |
-| Webhooks | `webhooks:read`, `webhooks:write` |
+| Manage Conversations | `conversations:update` |
+| Webhooks | `webhooks:read`, `webhooks:update` |
 
 ## Example Workflows
 

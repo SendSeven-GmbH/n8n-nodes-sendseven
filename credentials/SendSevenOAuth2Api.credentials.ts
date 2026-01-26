@@ -7,11 +7,11 @@ import type { ICredentialType, INodeProperties } from 'n8n-workflow';
  * Provides secure, token-based access with automatic refresh.
  *
  * Scopes available:
- * - messages:read, messages:send
- * - conversations:read, conversations:write
- * - contacts:read, contacts:create, contacts:write, contacts:delete
- * - tags:read, tags:write
- * - webhooks:read, webhooks:write
+ * - messages:read, messages:create
+ * - conversations:read, conversations:update
+ * - contacts:read, contacts:create, contacts:update, contacts:delete
+ * - tags:read, tags:update
+ * - webhooks:read, webhooks:update
  * - channels:read
  */
 export class SendSevenOAuth2Api implements ICredentialType {
@@ -43,7 +43,7 @@ export class SendSevenOAuth2Api implements ICredentialType {
 			displayName: 'Scope',
 			name: 'scope',
 			type: 'hidden',
-			default: 'messages:read messages:send conversations:read conversations:write contacts:read contacts:create contacts:write tags:read webhooks:read webhooks:write channels:read',
+			default: 'messages:read messages:create conversations:read conversations:update contacts:read contacts:create contacts:update tags:read webhooks:read webhooks:update channels:read',
 		},
 		{
 			displayName: 'Auth URI Query Parameters',
