@@ -114,7 +114,7 @@ export class SendSevenTrigger implements INodeType {
 
 				try {
 					// Fetch existing webhooks
-					const response = await sendSevenApiRequest.call(this, 'GET', '/webhooks');
+					const response = await sendSevenApiRequest.call(this, 'GET', '/webhook-endpoints');
 					const webhooks = (response as IDataObject).items as IDataObject[] || response as IDataObject[];
 
 					// Check if webhook already exists for this URL and event
@@ -152,7 +152,7 @@ export class SendSevenTrigger implements INodeType {
 				};
 
 				try {
-					const response = await sendSevenApiRequest.call(this, 'POST', '/webhooks', body);
+					const response = await sendSevenApiRequest.call(this, 'POST', '/webhook-endpoints', body);
 					const responseData = response as IDataObject;
 
 					// Store webhook ID and secret for later
@@ -179,7 +179,7 @@ export class SendSevenTrigger implements INodeType {
 				}
 
 				try {
-					await sendSevenApiRequest.call(this, 'DELETE', `/webhooks/${webhookId}`);
+					await sendSevenApiRequest.call(this, 'DELETE', `/webhook-endpoints/${webhookId}`);
 				} catch (error) {
 					// 404 is fine - webhook may have already been deleted
 					const err = error as IDataObject;
@@ -232,7 +232,9 @@ export class SendSevenTrigger implements INodeType {
 		switch (receivedEvent) {
 			case 'message.received':
 			case 'message.sent':
-			case 'message.status_updated': {
+			case 'message.delivered':
+			case 'message.failed':
+			case 'message.read': {
 				const message = data.message as IDataObject || {};
 				const contact = data.contact as IDataObject || {};
 				const conversation = data.conversation as IDataObject || {};
@@ -249,7 +251,9 @@ export class SendSevenTrigger implements INodeType {
 			}
 
 			case 'conversation.created':
-			case 'conversation.closed': {
+			case 'conversation.closed':
+			case 'conversation.assigned':
+			case 'conversation.reopened': {
 				const conversation = data.conversation as IDataObject || data;
 				const contact = data.contact as IDataObject || {};
 
@@ -264,7 +268,8 @@ export class SendSevenTrigger implements INodeType {
 			}
 
 			case 'contact.created':
-			case 'contact.updated': {
+			case 'contact.updated':
+			case 'contact.deleted': {
 				const contact = data.contact as IDataObject || data;
 
 				formattedData = {
@@ -276,26 +281,31 @@ export class SendSevenTrigger implements INodeType {
 				break;
 			}
 
-			case 'ticket.created':
-			case 'ticket.closed': {
-				const ticket = data.ticket as IDataObject || data;
-				const conversation = data.conversation as IDataObject || {};
+			case 'email.received':
+			case 'email.sent':
+			case 'email.delivered':
+			case 'email.bounced':
+			case 'email.opened': {
+				const email = data.email as IDataObject || {};
 				const contact = data.contact as IDataObject || {};
+				const conversation = data.conversation as IDataObject || {};
 
 				formattedData = {
-					id: ticket.id || body.event_id,
+					id: email.id || body.event_id,
 					event: receivedEvent,
-					ticket: {
-						id: ticket.id,
-						status: ticket.status,
-						summary: ticket.summary,
-						conversationId: ticket.conversation_id || conversation.id,
-						assignedToUserId: ticket.assigned_to_user_id,
-						createdAt: ticket.created_at,
-						closedAt: ticket.closed_at,
-					},
-					conversation: conversation.id ? formatConversationResponse(conversation) : null,
+					email,
 					contact: contact.id ? formatContactResponse(contact) : null,
+					conversation: conversation.id ? formatConversationResponse(conversation) : null,
+					timestamp: body.timestamp,
+				};
+				break;
+			}
+
+			case 'link.clicked': {
+				formattedData = {
+					id: body.event_id,
+					event: receivedEvent,
+					data,
 					timestamp: body.timestamp,
 				};
 				break;

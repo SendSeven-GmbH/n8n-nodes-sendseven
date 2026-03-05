@@ -26,13 +26,15 @@ import {
  * enabling multi-channel messaging (WhatsApp, Telegram, SMS, Email, etc.)
  *
  * Actions:
- * - Send Message
- * - Create Contact
- * - Update Contact
+ * - Send Message (3 addressing modes: recipient+channel, conversation_id, contact+channel)
+ * - Create Contact (with contact_methods support)
+ * - Update Contact (name, email, phone, avatar_url only)
  * - Add Tag to Contact
  * - Search Contacts
  * - Search Conversations
  * - Get Conversation
+ * - Close Conversation (POST with notes/summarize)
+ * - Assign Conversation (POST with user_id in URL)
  * - Send WhatsApp Template
  */
 export class SendSeven implements INodeType {
@@ -248,6 +250,36 @@ export class SendSeven implements INodeType {
 
 			// ==================== MESSAGE FIELDS ====================
 			{
+				displayName: 'Addressing Mode',
+				name: 'addressingMode',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['send'],
+					},
+				},
+				options: [
+					{
+						name: 'Recipient + Channel',
+						value: 'recipientChannel',
+						description: 'Send to a recipient identifier via a specific channel',
+					},
+					{
+						name: 'Conversation ID',
+						value: 'conversationId',
+						description: 'Reply to an existing conversation',
+					},
+					{
+						name: 'Contact ID + Channel',
+						value: 'contactChannel',
+						description: 'Send to a contact via a specific channel',
+					},
+				],
+				default: 'recipientChannel',
+				description: 'How to address the message recipient',
+			},
+			{
 				displayName: 'Channel',
 				name: 'channelId',
 				type: 'options',
@@ -258,6 +290,7 @@ export class SendSeven implements INodeType {
 					show: {
 						resource: ['message'],
 						operation: ['send'],
+						addressingMode: ['recipientChannel', 'contactChannel'],
 					},
 				},
 				default: '',
@@ -272,12 +305,43 @@ export class SendSeven implements INodeType {
 					show: {
 						resource: ['message'],
 						operation: ['send'],
+						addressingMode: ['recipientChannel'],
 					},
 				},
 				default: '',
 				required: true,
 				description: 'Recipient identifier (phone number for WhatsApp/SMS, email for Email)',
 				placeholder: '+1234567890',
+			},
+			{
+				displayName: 'Conversation ID',
+				name: 'messageConversationId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['send'],
+						addressingMode: ['conversationId'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'The conversation ID to reply to (recipient is resolved automatically)',
+			},
+			{
+				displayName: 'Contact ID',
+				name: 'messageContactId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['send'],
+						addressingMode: ['contactChannel'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'The contact ID to send the message to',
 			},
 			{
 				displayName: 'Message Text',
@@ -392,40 +456,16 @@ export class SendSeven implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['contact'],
-						operation: ['create', 'update'],
+						operation: ['create'],
 					},
 				},
 				options: [
 					{
-						displayName: 'First Name',
-						name: 'firstName',
-						type: 'string',
-						default: '',
-						description: 'First name of the contact',
-					},
-					{
-						displayName: 'Last Name',
-						name: 'lastName',
-						type: 'string',
-						default: '',
-						description: 'Last name of the contact',
-					},
-					{
-						displayName: 'Company',
-						name: 'company',
-						type: 'string',
-						default: '',
-						description: 'Company or organization name',
-					},
-					{
-						displayName: 'Notes',
-						name: 'notes',
-						type: 'string',
-						typeOptions: {
-							rows: 3,
-						},
-						default: '',
-						description: 'Internal notes about the contact',
+						displayName: 'Contact Methods',
+						name: 'contactMethods',
+						type: 'json',
+						default: '[]',
+						description: 'Contact methods as JSON array, e.g. [{"method_type": "whatsapp_id", "value": "1234567890"}]',
 					},
 					{
 						displayName: 'Custom Fields',
@@ -433,6 +473,28 @@ export class SendSeven implements INodeType {
 						type: 'json',
 						default: '{}',
 						description: 'Custom field values as JSON',
+					},
+				],
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFieldsUpdate',
+				type: 'collection',
+				placeholder: 'Add Field',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['update'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Avatar URL',
+						name: 'avatarUrl',
+						type: 'string',
+						default: '',
+						description: 'URL of the contact avatar image',
 					},
 				],
 			},
@@ -470,6 +532,38 @@ export class SendSeven implements INodeType {
 				description: 'Select the user to assign the conversation to',
 			},
 			{
+				displayName: 'Close Options',
+				name: 'closeOptions',
+				type: 'collection',
+				placeholder: 'Add Option',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: ['conversation'],
+						operation: ['close'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Notes',
+						name: 'notes',
+						type: 'string',
+						typeOptions: {
+							rows: 3,
+						},
+						default: '',
+						description: 'Optional closure notes',
+					},
+					{
+						displayName: 'Summarize',
+						name: 'summarize',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to generate an AI summary of the conversation',
+					},
+				],
+			},
+			{
 				displayName: 'Filters',
 				name: 'filters',
 				type: 'collection',
@@ -504,6 +598,13 @@ export class SendSeven implements INodeType {
 						options: CHANNEL_TYPES,
 						default: '',
 						description: 'Filter by channel type',
+					},
+					{
+						displayName: 'Needs Reply',
+						name: 'needsReply',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to filter for conversations that need a reply',
 					},
 				],
 			},
@@ -769,17 +870,28 @@ export class SendSeven implements INodeType {
 				// ==================== MESSAGE ====================
 				if (resource === 'message') {
 					if (operation === 'send') {
-						const channelId = this.getNodeParameter('channelId', i) as string;
-						const to = this.getNodeParameter('to', i) as string;
+						const addressingMode = this.getNodeParameter('addressingMode', i, 'recipientChannel') as string;
 						const text = this.getNodeParameter('text', i) as string;
 
-						validateRequiredFields(this, { channelId, to, text }, ['channelId', 'to', 'text']);
+						const body: IDataObject = { text };
 
-						const body: IDataObject = {
-							channel_id: channelId,
-							to,
-							text,
-						};
+						if (addressingMode === 'recipientChannel') {
+							const channelId = this.getNodeParameter('channelId', i) as string;
+							const to = this.getNodeParameter('to', i) as string;
+							validateRequiredFields(this, { channelId, to, text }, ['channelId', 'to', 'text']);
+							body.channel_id = channelId;
+							body.to = to;
+						} else if (addressingMode === 'conversationId') {
+							const conversationId = this.getNodeParameter('messageConversationId', i) as string;
+							validateRequiredFields(this, { conversationId, text }, ['conversationId', 'text']);
+							body.conversation_id = conversationId;
+						} else if (addressingMode === 'contactChannel') {
+							const channelId = this.getNodeParameter('channelId', i) as string;
+							const contactId = this.getNodeParameter('messageContactId', i) as string;
+							validateRequiredFields(this, { channelId, contactId, text }, ['channelId', 'contactId', 'text']);
+							body.channel_id = channelId;
+							body.contact_id = contactId;
+						}
 
 						responseData = await sendSevenApiRequest.call(this, 'POST', '/messages', body);
 						responseData = formatMessageResponse(responseData as IDataObject);
@@ -803,10 +915,11 @@ export class SendSeven implements INodeType {
 						if (phone) body.phone = phone;
 
 						const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
-						if (additionalFields.firstName) body.first_name = additionalFields.firstName;
-						if (additionalFields.lastName) body.last_name = additionalFields.lastName;
-						if (additionalFields.company) body.company = additionalFields.company;
-						if (additionalFields.notes) body.notes = additionalFields.notes;
+						if (additionalFields.contactMethods) {
+							body.contact_methods = typeof additionalFields.contactMethods === 'string'
+								? JSON.parse(additionalFields.contactMethods)
+								: additionalFields.contactMethods;
+						}
 						if (additionalFields.customFields) {
 							body.custom_fields = typeof additionalFields.customFields === 'string'
 								? JSON.parse(additionalFields.customFields)
@@ -830,16 +943,8 @@ export class SendSeven implements INodeType {
 						if (email) body.email = email;
 						if (phone) body.phone = phone;
 
-						const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
-						if (additionalFields.firstName) body.first_name = additionalFields.firstName;
-						if (additionalFields.lastName) body.last_name = additionalFields.lastName;
-						if (additionalFields.company) body.company = additionalFields.company;
-						if (additionalFields.notes) body.notes = additionalFields.notes;
-						if (additionalFields.customFields) {
-							body.custom_fields = typeof additionalFields.customFields === 'string'
-								? JSON.parse(additionalFields.customFields)
-								: additionalFields.customFields;
-						}
+						const additionalFields = this.getNodeParameter('additionalFieldsUpdate', i, {}) as IDataObject;
+						if (additionalFields.avatarUrl) body.avatar_url = additionalFields.avatarUrl;
 
 						responseData = await sendSevenApiRequest.call(this, 'PUT', `/contacts/${contactId}`, body);
 						responseData = formatContactResponse(responseData as IDataObject);
@@ -915,6 +1020,7 @@ export class SendSeven implements INodeType {
 						if (filters.contactId) query.contact_id = filters.contactId;
 						if (filters.status) query.status = filters.status;
 						if (filters.channelType) query.channel_type = filters.channelType;
+						if (filters.needsReply) query.needs_reply = filters.needsReply;
 
 						if (returnAll) {
 							responseData = await sendSevenApiRequestAllItems.call(this, '/conversations', query);
@@ -932,10 +1038,16 @@ export class SendSeven implements INodeType {
 						const conversationId = this.getNodeParameter('conversationId', i) as string;
 						validateRequiredFields(this, { conversationId }, ['conversationId']);
 
+						const closeOptions = this.getNodeParameter('closeOptions', i, {}) as IDataObject;
+						const body: IDataObject = {};
+						if (closeOptions.notes) body.notes = closeOptions.notes;
+						if (closeOptions.summarize !== undefined) body.summarize = closeOptions.summarize;
+
 						responseData = await sendSevenApiRequest.call(
 							this,
-							'PUT',
+							'POST',
 							`/conversations/${conversationId}/close`,
+							body,
 						);
 						responseData = formatConversationResponse(responseData as IDataObject);
 					}
@@ -948,9 +1060,8 @@ export class SendSeven implements INodeType {
 
 						responseData = await sendSevenApiRequest.call(
 							this,
-							'PUT',
-							`/conversations/${conversationId}/assign`,
-							{ user_id: userId },
+							'POST',
+							`/conversations/${conversationId}/assign/${userId}`,
 						);
 						responseData = formatConversationResponse(responseData as IDataObject);
 					}

@@ -199,7 +199,6 @@ export const CHANNEL_TYPES = [
 export const CONVERSATION_STATUSES = [
 	{ name: 'Open', value: 'open' },
 	{ name: 'Closed', value: 'closed' },
-	{ name: 'Pending', value: 'pending' },
 ];
 
 /**
@@ -208,14 +207,22 @@ export const CONVERSATION_STATUSES = [
 export const WEBHOOK_EVENTS = [
 	{ name: 'Message Received', value: 'message.received' },
 	{ name: 'Message Sent', value: 'message.sent' },
-	{ name: 'Message Status Updated', value: 'message.status_updated' },
+	{ name: 'Message Delivered', value: 'message.delivered' },
+	{ name: 'Message Failed', value: 'message.failed' },
+	{ name: 'Message Read', value: 'message.read' },
+	{ name: 'Email Received', value: 'email.received' },
+	{ name: 'Email Sent', value: 'email.sent' },
+	{ name: 'Email Delivered', value: 'email.delivered' },
+	{ name: 'Email Bounced', value: 'email.bounced' },
+	{ name: 'Email Opened', value: 'email.opened' },
 	{ name: 'Conversation Created', value: 'conversation.created' },
 	{ name: 'Conversation Closed', value: 'conversation.closed' },
+	{ name: 'Conversation Assigned', value: 'conversation.assigned' },
+	{ name: 'Conversation Reopened', value: 'conversation.reopened' },
 	{ name: 'Contact Created', value: 'contact.created' },
 	{ name: 'Contact Updated', value: 'contact.updated' },
-	{ name: 'Ticket Created', value: 'ticket.created' },
-	{ name: 'Ticket Closed', value: 'ticket.closed' },
-	{ name: 'Campaign Sent', value: 'campaign.sent' },
+	{ name: 'Contact Deleted', value: 'contact.deleted' },
+	{ name: 'Link Clicked', value: 'link.clicked' },
 ];
 
 /**
@@ -225,14 +232,15 @@ export function formatContactResponse(contact: IDataObject): IDataObject {
 	return {
 		id: contact.id,
 		name: contact.name,
-		firstName: contact.first_name,
-		lastName: contact.last_name,
 		email: contact.email,
 		phone: contact.phone,
-		company: contact.company,
-		notes: contact.notes,
+		avatarUrl: contact.avatar_url,
+		language: contact.language,
+		isBlocked: contact.is_blocked,
+		contactMethods: contact.contact_methods,
 		customFields: contact.custom_fields,
 		tags: contact.tags,
+		lastContactedAt: contact.last_contacted_at,
 		createdAt: contact.created_at,
 		updatedAt: contact.updated_at,
 	};
@@ -245,14 +253,17 @@ export function formatConversationResponse(conversation: IDataObject): IDataObje
 	return {
 		id: conversation.id,
 		contactId: conversation.contact_id,
-		contactName: conversation.contact_name || (conversation.contact as IDataObject)?.name,
+		contactName: (conversation.contact as IDataObject)?.name,
 		channelType: conversation.channel_type,
 		channelId: conversation.channel_id,
 		status: conversation.status,
-		assignedToUserId: conversation.assigned_to_user_id,
+		subject: conversation.subject,
+		assignedUserId: conversation.assigned_user_id,
+		needsReply: conversation.needs_reply,
+		isLiveChat: conversation.is_live_chat,
+		isEmail: conversation.is_email,
+		contactMethodId: conversation.contact_method_id,
 		lastMessageAt: conversation.last_message_at,
-		messageCount: conversation.message_count,
-		unreadCount: conversation.unread_count,
 		createdAt: conversation.created_at,
 		updatedAt: conversation.updated_at,
 	};

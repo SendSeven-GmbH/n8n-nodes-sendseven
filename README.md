@@ -51,13 +51,22 @@ Listen for real-time events:
 
 - **Message Received**: Triggers when a new inbound message is received
 - **Message Sent**: Triggers when an outbound message is delivered
-- **Message Status Updated**: Triggers when message status changes
+- **Message Delivered**: Triggers when message delivery is confirmed
+- **Message Failed**: Triggers when a message fails to send
+- **Message Read**: Triggers when a message read receipt is received
+- **Email Received**: Triggers when an inbound email is received
+- **Email Sent**: Triggers when an outbound email is sent
+- **Email Delivered**: Triggers when an email delivery is confirmed
+- **Email Bounced**: Triggers when an email bounces
+- **Email Opened**: Triggers when an email is opened
 - **Conversation Created**: Triggers when a new conversation starts
 - **Conversation Closed**: Triggers when a conversation is closed
+- **Conversation Assigned**: Triggers when a conversation is assigned to an agent
+- **Conversation Reopened**: Triggers when a conversation is reopened
 - **Contact Created**: Triggers when a new contact is created
 - **Contact Updated**: Triggers when a contact is updated
-- **Ticket Created**: Triggers when a support ticket is created
-- **Ticket Closed**: Triggers when a ticket is resolved
+- **Contact Deleted**: Triggers when a contact is deleted
+- **Link Clicked**: Triggers when a tracked link is clicked
 - **Campaign Sent**: Triggers when a campaign completes sending
 
 ## Authentication
@@ -92,10 +101,12 @@ Different operations require different scopes:
 | Read Messages | `messages:read` |
 | Create/Update Contact | `contacts:create`, `contacts:update` |
 | Read Contacts | `contacts:read` |
-| Manage Tags | `tags:read`, `tags:update` |
+| Manage Tags | `tags:read` |
 | Read Conversations | `conversations:read` |
 | Manage Conversations | `conversations:update` |
-| Webhooks | `webhooks:read`, `webhooks:update` |
+| Webhooks | `webhooks:create`, `webhooks:read`, `webhooks:delete` |
+| Knowledge Base | `knowledge_base:read` |
+| Team Members | `team:read` |
 
 ## Example Workflows
 
@@ -134,6 +145,22 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### 1.1.0
+
+- **BREAKING**: Webhook endpoint path changed from `/webhooks` to `/webhook-endpoints`
+- **BREAKING**: Conversation close now uses POST (was PUT) with `notes` field (was `resolution_note`)
+- **BREAKING**: Conversation assign now uses POST with user_id in URL path (was PUT with body)
+- **BREAKING**: Removed `pending` conversation status (only `open` and `closed` remain)
+- Added 3 message addressing modes: Recipient+Channel, Conversation ID, Contact+Channel
+- Added `contact_methods` support for contact creation
+- Updated contact fields: removed `firstName`, `lastName`, `company`, `notes`; added `contactMethods`, `language`, `isBlocked`
+- Updated conversation fields: `assigned_user_id` (was `assigned_to_user_id`), added `needs_reply`, `is_live_chat`, `is_email`, `subject`; removed `message_count`, `unread_count`
+- Updated contact update to only accept `name`, `email`, `phone`, `avatar_url`
+- Added close options: `notes` and `summarize` fields
+- Added conversation search filter: `needs_reply`
+- Updated webhook events: added `message.delivered`, `message.failed`, `message.read`, `email.*`, `conversation.assigned`, `conversation.reopened`, `contact.deleted`, `link.clicked`; removed `message.status_updated`, `ticket.created`, `ticket.closed`
+- Updated OAuth2 scopes: replaced `webhooks:update` with `webhooks:create`/`webhooks:delete`; added `knowledge_base:read`, `team:read`
 
 ### 1.0.0
 
