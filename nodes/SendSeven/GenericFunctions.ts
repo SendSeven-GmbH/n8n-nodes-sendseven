@@ -64,6 +64,57 @@ export async function sendSevenApiRequest(
 }
 
 /**
+ * Make an authenticated multipart/form-data request to the SendSeven API
+ *
+ * Used for binary uploads (e.g. POST /attachments/upload). The file part
+ * field name MUST be `file` to match the backend handler (File(...) at
+ * attachments.py:331). An optional `message_id` string part is supported.
+ *
+ * @param this - n8n context
+ * @param endpoint - API endpoint (without base URL)
+ * @param file - the binary file to upload (buffer + filename + content type)
+ * @param extraFields - optional string form fields (e.g. message_id)
+ * @returns API response data (AttachmentUploadResponse)
+ */
+export async function sendSevenApiRequestFormData(
+	this: IExecuteFunctions,
+	endpoint: string,
+	file: { buffer: Buffer; filename: string; contentType?: string },
+	extraFields: IDataObject = {},
+): Promise<IDataObject> {
+	const formData = new FormData();
+	const blob = new Blob([file.buffer], {
+		type: file.contentType || 'application/octet-stream',
+	});
+	formData.append('file', blob, file.filename);
+
+	for (const [key, value] of Object.entries(extraFields)) {
+		if (value !== undefined && value !== null && value !== '') {
+			formData.append(key, String(value));
+		}
+	}
+
+	const options: IHttpRequestOptions = {
+		method: 'POST',
+		url: `${API_BASE_URL}${endpoint}`,
+		body: formData,
+	};
+
+	try {
+		const credentialType = await getCredentialType.call(this);
+		return await this.helpers.httpRequestWithAuthentication.call(
+			this,
+			credentialType,
+			options,
+		) as IDataObject;
+	} catch (error) {
+		throw new NodeApiError(this.getNode(), error as JsonObject, {
+			message: getErrorMessage(error),
+		});
+	}
+}
+
+/**
  * Make a paginated request to the SendSeven API
  * Automatically fetches all pages and combines results
  *

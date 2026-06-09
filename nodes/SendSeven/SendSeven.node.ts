@@ -11,6 +11,7 @@ import type {
 import {
 	sendSevenApiRequest,
 	sendSevenApiRequestAllItems,
+	sendSevenApiRequestFormData,
 	validateRequiredFields,
 	formatContactResponse,
 	formatConversationResponse,
@@ -26,16 +27,20 @@ import {
  * enabling multi-channel messaging (WhatsApp, Telegram, SMS, Email, etc.)
  *
  * Actions:
- * - Send Message (3 addressing modes: recipient+channel, conversation_id, contact+channel)
+ * - Send Message (3 addressing modes: recipient+channel, conversation_id, contact+channel; optional attachment UUIDs)
  * - Create Contact (with contact_methods support)
  * - Update Contact (name, email, phone, avatar_url only)
- * - Add Tag to Contact
+ * - Delete Contact (GDPR delete)
+ * - Add Tag / Remove Tag to/from Contact
+ * - Set Custom Field on Contact (two-step: GET /custom-fields -> POST /contacts/{id}/fields/{field_id})
+ * - Add Method / Delete Method on Contact (platform IDs via /contacts/{id}/methods)
  * - Search Contacts
  * - Search Conversations
  * - Get Conversation
  * - Close Conversation (POST with notes/summarize)
  * - Assign Conversation (POST with user_id in URL)
  * - Send WhatsApp Template
+ * - Upload Attachment (binary input -> multipart) / Upload Attachment from URL
  */
 export class SendSeven implements INodeType {
 	description: INodeTypeDescription = {
@@ -112,6 +117,10 @@ export class SendSeven implements INodeType {
 						name: 'WhatsApp Template',
 						value: 'whatsappTemplate',
 					},
+					{
+						name: 'Attachment',
+						value: 'attachment',
+					},
 				],
 				default: 'message',
 			},
@@ -173,10 +182,40 @@ export class SendSeven implements INodeType {
 						action: 'Search contacts',
 					},
 					{
+						name: 'Delete',
+						value: 'delete',
+						description: 'Delete a contact (GDPR delete)',
+						action: 'Delete a contact',
+					},
+					{
 						name: 'Add Tag',
 						value: 'addTag',
 						description: 'Add a tag to a contact',
 						action: 'Add tag to contact',
+					},
+					{
+						name: 'Remove Tag',
+						value: 'removeTag',
+						description: 'Remove a tag from a contact',
+						action: 'Remove tag from contact',
+					},
+					{
+						name: 'Set Custom Field',
+						value: 'setCustomField',
+						description: 'Set a custom field value on a contact',
+						action: 'Set custom field on contact',
+					},
+					{
+						name: 'Add Method',
+						value: 'addMethod',
+						description: 'Add a contact method (platform ID) to a contact',
+						action: 'Add method to contact',
+					},
+					{
+						name: 'Delete Method',
+						value: 'deleteMethod',
+						description: 'Delete a contact method from a contact',
+						action: 'Delete method from contact',
 					},
 				],
 				default: 'create',
@@ -246,6 +285,33 @@ export class SendSeven implements INodeType {
 					},
 				],
 				default: 'send',
+			},
+			// Attachment operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['attachment'],
+					},
+				},
+				options: [
+					{
+						name: 'Upload',
+						value: 'upload',
+						description: 'Upload a binary file as an attachment',
+						action: 'Upload an attachment',
+					},
+					{
+						name: 'Upload from URL',
+						value: 'uploadFromUrl',
+						description: 'Fetch a public URL and store it as an attachment',
+						action: 'Upload an attachment from URL',
+					},
+				],
+				default: 'upload',
 			},
 
 			// ==================== MESSAGE FIELDS ====================
@@ -360,6 +426,21 @@ export class SendSeven implements INodeType {
 				required: true,
 				description: 'The message content to send',
 			},
+			{
+				displayName: 'Attachment IDs',
+				name: 'attachments',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['send'],
+					},
+				},
+				default: '',
+				description:
+					'Comma-separated attachment UUIDs (from the Attachment resource). Each must be a valid attachment ID, not a raw URL.',
+				placeholder: '550e8400-e29b-41d4-a716-446655440000, ...',
+			},
 
 			// ==================== CONTACT FIELDS ====================
 			{
@@ -369,7 +450,16 @@ export class SendSeven implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['contact'],
-						operation: ['get', 'update', 'addTag'],
+						operation: [
+							'get',
+							'update',
+							'delete',
+							'addTag',
+							'removeTag',
+							'setCustomField',
+							'addMethod',
+							'deleteMethod',
+						],
 					},
 				},
 				default: '',
@@ -440,12 +530,12 @@ export class SendSeven implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['contact'],
-						operation: ['addTag'],
+						operation: ['addTag', 'removeTag'],
 					},
 				},
 				default: '',
 				required: true,
-				description: 'Select the tag to add to the contact',
+				description: 'Select the tag to add to or remove from the contact',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -466,13 +556,6 @@ export class SendSeven implements INodeType {
 						type: 'json',
 						default: '[]',
 						description: 'Contact methods as JSON array, e.g. [{"method_type": "whatsapp_id", "value": "1234567890"}]',
-					},
-					{
-						displayName: 'Custom Fields',
-						name: 'customFields',
-						type: 'json',
-						default: '{}',
-						description: 'Custom field values as JSON',
 					},
 				],
 			},
@@ -497,6 +580,107 @@ export class SendSeven implements INodeType {
 						description: 'URL of the contact avatar image',
 					},
 				],
+			},
+			// ---- Set Custom Field ----
+			{
+				displayName: 'Custom Field',
+				name: 'customFieldId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getCustomFields',
+				},
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['setCustomField'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'Select the custom field definition to set',
+			},
+			{
+				displayName: 'Value',
+				name: 'customFieldValue',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['setCustomField'],
+					},
+				},
+				default: '',
+				description: 'The value to set for the custom field (type depends on the field definition)',
+			},
+			// ---- Add Method ----
+			{
+				displayName: 'Method Type',
+				name: 'methodType',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['addMethod'],
+					},
+				},
+				options: [
+					{ name: 'Phone', value: 'phone' },
+					{ name: 'Email', value: 'email' },
+					{ name: 'WhatsApp ID', value: 'whatsapp_id' },
+					{ name: 'Telegram ID', value: 'telegram_id' },
+					{ name: 'Messenger ID', value: 'messenger_id' },
+					{ name: 'Instagram ID', value: 'instagram_id' },
+				],
+				default: 'phone',
+				required: true,
+				description: 'The type of contact method to add',
+			},
+			{
+				displayName: 'Value',
+				name: 'methodValue',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['addMethod'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'The method value (phone number, email, or platform ID)',
+			},
+			{
+				displayName: 'Channel',
+				name: 'methodChannelId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getChannels',
+				},
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['addMethod'],
+						methodType: ['messenger_id', 'instagram_id'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'Channel this page-scoped method belongs to (required for Messenger/Instagram IDs)',
+			},
+			// ---- Delete Method ----
+			{
+				displayName: 'Method ID',
+				name: 'methodId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['deleteMethod'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'The unique ID of the contact method to delete',
 			},
 
 			// ==================== CONVERSATION FIELDS ====================
@@ -710,6 +894,72 @@ export class SendSeven implements INodeType {
 				],
 			},
 
+			// ==================== ATTACHMENT FIELDS ====================
+			{
+				displayName: 'Input Binary Field',
+				name: 'binaryPropertyName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['attachment'],
+						operation: ['upload'],
+					},
+				},
+				default: 'data',
+				required: true,
+				description: 'Name of the binary property containing the file to upload',
+			},
+			{
+				displayName: 'File URL',
+				name: 'fileUrl',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['attachment'],
+						operation: ['uploadFromUrl'],
+					},
+				},
+				default: '',
+				required: true,
+				description:
+					'Public http(s) URL to fetch. Allowed types are stricter than direct upload (images, mp4/mov/webm, common audio, pdf).',
+				placeholder: 'https://example.com/file.pdf',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'attachmentAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add Field',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: ['attachment'],
+						operation: ['upload', 'uploadFromUrl'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Filename',
+						name: 'filename',
+						type: 'string',
+						default: '',
+						description: 'Override the filename for the stored attachment',
+					},
+					{
+						displayName: 'Message ID',
+						name: 'messageId',
+						type: 'string',
+						default: '',
+						description: 'Optional message ID to associate the upload with (upload only)',
+						displayOptions: {
+							show: {
+								'/operation': ['upload'],
+							},
+						},
+					},
+				],
+			},
+
 			// ==================== OPTIONS ====================
 			{
 				displayName: 'Return All',
@@ -779,6 +1029,17 @@ export class SendSeven implements INodeType {
 				return tags.map((tag) => ({
 					name: tag.name as string,
 					value: tag.id as string,
+				}));
+			},
+
+			/**
+			 * Get custom field definitions for dropdown
+			 */
+			async getCustomFields(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const fields = await sendSevenApiRequestAllItems.call(this, '/custom-fields');
+				return fields.map((field) => ({
+					name: `${field.name as string} (${field.key as string})`,
+					value: field.id as string,
 				}));
 			},
 
@@ -875,6 +1136,17 @@ export class SendSeven implements INodeType {
 
 						const body: IDataObject = { text };
 
+						const attachmentsRaw = this.getNodeParameter('attachments', i, '') as string;
+						if (attachmentsRaw) {
+							const attachmentIds = attachmentsRaw
+								.split(',')
+								.map((id) => id.trim())
+								.filter((id) => id.length > 0);
+							if (attachmentIds.length > 0) {
+								body.attachments = attachmentIds;
+							}
+						}
+
 						if (addressingMode === 'recipientChannel') {
 							const channelId = this.getNodeParameter('channelId', i) as string;
 							const to = this.getNodeParameter('to', i) as string;
@@ -920,11 +1192,8 @@ export class SendSeven implements INodeType {
 								? JSON.parse(additionalFields.contactMethods)
 								: additionalFields.contactMethods;
 						}
-						if (additionalFields.customFields) {
-							body.custom_fields = typeof additionalFields.customFields === 'string'
-								? JSON.parse(additionalFields.customFields)
-								: additionalFields.customFields;
-						}
+						// NOTE: custom_fields are NOT settable on the contact body (backend silently
+						// drops them). Use the dedicated "Set Custom Field" operation instead.
 
 						responseData = await sendSevenApiRequest.call(this, 'POST', '/contacts', body);
 						responseData = formatContactResponse(responseData as IDataObject);
@@ -999,6 +1268,91 @@ export class SendSeven implements INodeType {
 							tagId,
 							message: 'Tag added successfully',
 						};
+					}
+
+					else if (operation === 'removeTag') {
+						const contactId = this.getNodeParameter('contactId', i) as string;
+						const tagId = this.getNodeParameter('tagId', i) as string;
+
+						validateRequiredFields(this, { contactId, tagId }, ['contactId', 'tagId']);
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'DELETE',
+							`/contacts/${contactId}/tags/${tagId}`,
+						);
+						responseData = {
+							success: true,
+							contactId,
+							tagId,
+							message: 'Tag removed successfully',
+						};
+					}
+
+					else if (operation === 'delete') {
+						const contactId = this.getNodeParameter('contactId', i) as string;
+						validateRequiredFields(this, { contactId }, ['contactId']);
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'DELETE',
+							`/contacts/${contactId}`,
+						);
+					}
+
+					else if (operation === 'setCustomField') {
+						const contactId = this.getNodeParameter('contactId', i) as string;
+						const fieldId = this.getNodeParameter('customFieldId', i) as string;
+						const value = this.getNodeParameter('customFieldValue', i, '') as string;
+
+						validateRequiredFields(this, { contactId, fieldId }, ['contactId', 'fieldId']);
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'POST',
+							`/contacts/${contactId}/fields/${fieldId}`,
+							{ value },
+						);
+					}
+
+					else if (operation === 'addMethod') {
+						const contactId = this.getNodeParameter('contactId', i) as string;
+						const methodType = this.getNodeParameter('methodType', i) as string;
+						const value = this.getNodeParameter('methodValue', i) as string;
+
+						validateRequiredFields(
+							this,
+							{ contactId, methodType, value },
+							['contactId', 'methodType', 'value'],
+						);
+
+						const body: IDataObject = { method_type: methodType, value };
+
+						if (methodType === 'messenger_id' || methodType === 'instagram_id') {
+							const channelId = this.getNodeParameter('methodChannelId', i, '') as string;
+							validateRequiredFields(this, { channelId }, ['channelId']);
+							body.channel_id = channelId;
+						}
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'POST',
+							`/contacts/${contactId}/methods`,
+							body,
+						);
+					}
+
+					else if (operation === 'deleteMethod') {
+						const contactId = this.getNodeParameter('contactId', i) as string;
+						const methodId = this.getNodeParameter('methodId', i) as string;
+
+						validateRequiredFields(this, { contactId, methodId }, ['contactId', 'methodId']);
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'DELETE',
+							`/contacts/${contactId}/methods/${methodId}`,
+						);
 					}
 				}
 
@@ -1140,6 +1494,50 @@ export class SendSeven implements INodeType {
 							);
 							responseData = (response as IDataObject).items as IDataObject[] || response;
 						}
+					}
+				}
+
+				// ==================== ATTACHMENT ====================
+				else if (resource === 'attachment') {
+					if (operation === 'upload') {
+						const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i, 'data') as string;
+						const additionalFields = this.getNodeParameter('attachmentAdditionalFields', i, {}) as IDataObject;
+
+						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+
+						const filename = (additionalFields.filename as string) || binaryData.fileName || 'file';
+
+						const extraFields: IDataObject = {};
+						if (additionalFields.messageId) {
+							extraFields.message_id = additionalFields.messageId as string;
+						}
+
+						responseData = await sendSevenApiRequestFormData.call(
+							this,
+							'/attachments/upload',
+							{ buffer, filename, contentType: binaryData.mimeType },
+							extraFields,
+						);
+					}
+
+					else if (operation === 'uploadFromUrl') {
+						const fileUrl = this.getNodeParameter('fileUrl', i) as string;
+						const additionalFields = this.getNodeParameter('attachmentAdditionalFields', i, {}) as IDataObject;
+
+						validateRequiredFields(this, { fileUrl }, ['fileUrl']);
+
+						const body: IDataObject = { url: fileUrl };
+						if (additionalFields.filename) {
+							body.filename = additionalFields.filename as string;
+						}
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'POST',
+							'/attachments/from-url',
+							body,
+						);
 					}
 				}
 

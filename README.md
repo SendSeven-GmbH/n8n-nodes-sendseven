@@ -27,13 +27,19 @@ npm install n8n-nodes-sendseven
 
 #### Message
 - **Send**: Send a message through any channel (WhatsApp, Telegram, SMS, Email, etc.)
+  - Supports **attachments**: provide a comma-separated list of attachment UUIDs (from the Attachment resource) in the **Attachment IDs** field. These map to the `attachments` array of `POST /messages`. Raw URLs are not accepted — upload first.
 
 #### Contact
 - **Create**: Create a new contact
-- **Update**: Update an existing contact
+- **Update**: Update an existing contact (name, email, phone, avatar URL)
 - **Get**: Get a contact by ID
+- **Delete**: Delete a contact (GDPR delete — conversations anonymized, billing preserved)
 - **Search**: Search contacts by name, email, or phone
 - **Add Tag**: Add a tag to a contact
+- **Remove Tag**: Remove a tag from a contact
+- **Set Custom Field**: Set a custom field value on a contact. The **Custom Field** dropdown is populated from your tenant's field definitions (`GET /custom-fields`); the value is written via `POST /contacts/{id}/fields/{field_id}`.
+- **Add Method**: Add a contact method (platform ID). Method types: `phone`, `email`, `whatsapp_id`, `telegram_id`, `messenger_id`, `instagram_id`. For `messenger_id`/`instagram_id` a **Channel** must be selected (these IDs are page-scoped).
+- **Delete Method**: Delete a contact method by its method ID.
 
 #### Conversation
 - **Get**: Get a conversation by ID
@@ -44,6 +50,17 @@ npm install n8n-nodes-sendseven
 #### WhatsApp Template
 - **Send**: Send a pre-approved WhatsApp template message
 - **List**: List available WhatsApp templates
+
+#### Attachment
+- **Upload**: Upload a binary file (from an incoming binary property such as the output of an HTTP/Read-Binary node) as a multipart `POST /attachments/upload`. Returns the attachment `id`.
+- **Upload from URL**: Fetch a public http(s) URL server-side via `POST /attachments/from-url` and store it. Returns the attachment `id`. Note: the URL-fetch MIME allowlist is stricter than direct upload (images, mp4/mov/webm, common audio, pdf).
+
+##### Sending a message with an attachment
+
+Chain two nodes:
+
+1. **Attachment → Upload** (or **Upload from URL**) — produces an attachment object whose `id` is the attachment UUID.
+2. **Message → Send** — set the **Attachment IDs** field to an expression referencing the previous node's `id` (e.g. `{{ $json.id }}`), or a comma-separated list of several UUIDs. The node passes these into the `attachments` array of `POST /messages`, and the channel adapter renders them by content type (e.g. WhatsApp image/document, email attachment).
 
 ### SendSeven Trigger Node (Webhooks)
 
@@ -98,9 +115,12 @@ Different operations require different scopes:
 | Operation | Required Scopes |
 |-----------|-----------------|
 | Send Message | `messages:create` |
+| Upload Attachment | `messages:create` |
 | Read Messages | `messages:read` |
 | Create/Update Contact | `contacts:create`, `contacts:update` |
+| Delete Contact / Add or Delete Method / Set Custom Field | `contacts:update` (delete: `contacts:delete`) |
 | Read Contacts | `contacts:read` |
+| Read Custom Field Definitions | `settings:read` |
 | Manage Tags | `tags:read` |
 | Read Conversations | `conversations:read` |
 | Manage Conversations | `conversations:update` |
@@ -145,6 +165,19 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### 1.2.0
+
+- **BREAKING FIX (custom fields)**: Custom fields are no longer sent in the contact Create/Update body — the backend silently dropped them (they are not contact-body fields). The dead `Custom Fields` JSON option was removed from Contact → Create. Use the new **Contact → Set Custom Field** operation, which resolves the field definition via `GET /custom-fields` (loadOptions dropdown) and writes the value via `POST /contacts/{id}/fields/{field_id}`. **Action required:** any workflow that relied on the old `Custom Fields` create/update option must switch to Set Custom Field — the old option had no effect.
+- Added **Attachment** resource:
+  - **Upload** — binary input → multipart `POST /attachments/upload` (file part `file`, optional `message_id`).
+  - **Upload from URL** — `POST /attachments/from-url` (stricter MIME allowlist).
+  - Both return the attachment `id` for downstream use.
+- **Message → Send**: added an **Attachment IDs** field (comma-separated attachment UUIDs) wired into the `attachments` array of `POST /messages`.
+- Added **Contact → Delete** (`DELETE /contacts/{id}`, GDPR delete).
+- Added **Contact → Add Method** / **Delete Method** (`POST`/`DELETE /contacts/{id}/methods`). Channel selection is shown conditionally and required for `messenger_id`/`instagram_id`.
+- Added **Contact → Remove Tag** (`DELETE /contacts/{id}/tags/{tag_id}`).
+- Added `getCustomFields` loadOptions helper and a `sendSevenApiRequestFormData` helper for authenticated multipart uploads.
 
 ### 1.1.0
 
