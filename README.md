@@ -166,6 +166,11 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### 1.2.4
+
+- Republished from GitHub Actions with an npm **provenance** statement (required for n8n verified community node review). No functional changes from 1.2.3.
+- Normalized `repository.url` to the `git+https://...git` form required for provenance verification.
+
 ### 1.2.0
 
 - **BREAKING FIX (custom fields)**: Custom fields are no longer sent in the contact Create/Update body — the backend silently dropped them (they are not contact-body fields). The dead `Custom Fields` JSON option was removed from Contact → Create. Use the new **Contact → Set Custom Field** operation, which resolves the field definition via `GET /custom-fields` (loadOptions dropdown) and writes the value via `POST /contacts/{id}/fields/{field_id}`. **Action required:** any workflow that relied on the old `Custom Fields` create/update option must switch to Set Custom Field — the old option had no effect.

@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-sendseven",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "n8n community node for SendSeven - Unified Messaging API Platform",
   "keywords": [
     "n8n-community-node-package",
@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/SendSeven-GmbH/n8n-nodes-sendseven"
+    "url": "git+https://github.com/SendSeven-GmbH/n8n-nodes-sendseven.git"
   },
   "engines": {
     "node": ">=18.0.0"
