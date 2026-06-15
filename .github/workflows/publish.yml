@@ -32,7 +32,12 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
-        run: npm ci
+        # --ignore-scripts skips lifecycle/native-build scripts so the native
+        # transitive dependency isolated-vm (pulled in via n8n-workflow, requires
+        # Node >=22) never runs node-gyp. All package files including the
+        # n8n-workflow TypeScript .d.ts definitions are still extracted, which is
+        # all `tsc` needs. This does NOT depend on isolated-vm ever compiling.
+        run: npm ci --ignore-scripts
 
       - name: Build
         run: npm run build
