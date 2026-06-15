@@ -16,7 +16,7 @@ import type {
 export class SendSevenApi implements ICredentialType {
 	name = 'sendSevenApi';
 	displayName = 'SendSeven API';
-	documentationUrl = 'https://sendseven.com/docs/api/authentication';
+	documentationUrl = 'https://docs.sendseven.com/guides/integrations/n8n';
 
 	properties: INodeProperties[] = [
 		{
@@ -44,7 +44,7 @@ export class SendSevenApi implements ICredentialType {
 	test: ICredentialTestRequest = {
 		request: {
 			baseURL: 'https://api.sendseven.com/api/v1',
-			url: '/oauth-apps/userinfo',
+			url: '/users/me',
 			method: 'GET',
 		},
 	};

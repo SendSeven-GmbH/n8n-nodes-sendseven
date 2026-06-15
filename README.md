@@ -150,14 +150,14 @@ Different operations require different scopes:
 
 ## Resources
 
-- [SendSeven Documentation](https://sendseven.com/docs)
+- [SendSeven Documentation](https://docs.sendseven.com/guides/integrations/n8n)
 - [SendSeven API Reference](https://api.sendseven.com/api/v1/docs)
 - [n8n Community Nodes](https://docs.n8n.io/integrations/community-nodes/)
 
 ## Support
 
 - **Email**: dev@sendseven.com
-- **Documentation**: https://sendseven.com/docs
+- **Documentation**: https://docs.sendseven.com/guides/integrations/n8n
 - **Status**: https://status.sendseven.com
 
 ## License
