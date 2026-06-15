@@ -5,7 +5,9 @@ import type {
 	INodeTypeDescription,
 	IWebhookFunctions,
 	IWebhookResponseData,
+	JsonObject,
 } from 'n8n-workflow';
+import { NodeApiError } from 'n8n-workflow';
 
 import {
 	sendSevenApiRequest,
@@ -162,7 +164,14 @@ export class SendSevenTrigger implements INodeType {
 
 					return true;
 				} catch (error) {
-					return false;
+					// Surface the real reason the subscription could not be created
+					// (e.g. 403 missing `webhooks:create` scope, or the backend rejecting
+					// a non-public/localhost webhook URL) instead of silently failing.
+					throw new NodeApiError(this.getNode(), error as JsonObject, {
+						message: 'Failed to register SendSeven webhook subscription',
+						description:
+							'SendSeven could not create the webhook subscription. Common causes: the API token is missing the "webhooks:create" scope, or the n8n webhook URL is not publicly reachable (localhost/private URLs are rejected — expose n8n with a public URL or tunnel).',
+					});
 				}
 			},
 
@@ -183,8 +192,15 @@ export class SendSevenTrigger implements INodeType {
 				} catch (error) {
 					// 404 is fine - webhook may have already been deleted
 					const err = error as IDataObject;
-					if ((err.httpCode || err.statusCode) !== 404) {
-						return false;
+					const httpCode = err.httpCode || err.statusCode;
+					if (String(httpCode) !== '404') {
+						// Surface real removal failures (e.g. 403 missing `webhooks:delete`
+						// scope) so a dangling subscription doesn't keep delivering events.
+						throw new NodeApiError(this.getNode(), error as JsonObject, {
+							message: 'Failed to remove SendSeven webhook subscription',
+							description:
+								'SendSeven could not delete the webhook subscription. The API token may be missing the "webhooks:delete" scope. The subscription may keep delivering events until removed.',
+						});
 					}
 				}
 
@@ -205,8 +221,32 @@ export class SendSevenTrigger implements INodeType {
 		const body = this.getBodyData() as IDataObject;
 		const event = this.getNodeParameter('event') as string;
 
-		// Validate event type matches
-		const receivedEvent = body.event as string;
+		// --- SendSeven webhook verification handshake ---
+		// Immediately after a webhook endpoint is created, SendSeven POSTs a
+		// one-time verification challenge to the registered URL (NOT HMAC-signed):
+		//   header  X-Sendseven-Event: verification
+		//   body    { "type": "sendseven_verification", "challenge": "<32hex>", ... }
+		// The subscriber MUST reply with HTTP status EXACTLY 200 and a JSON body
+		// { "challenge": "<the same challenge>" }. A non-200 status (201/204) FAILS
+		// verification and the endpoint never activates (no events are ever delivered).
+		// We answer it here, before any event-type matching, and emit no workflow data
+		// (a verification ping is not a real event).
+		const verificationHeader = (req.headers['x-sendseven-event'] as string) || '';
+		const isVerification =
+			body.type === 'sendseven_verification' || verificationHeader === 'verification';
+		if (isVerification) {
+			const res = this.getResponseObject();
+			res.status(200).json({ challenge: body.challenge });
+			return {
+				noWebhookResponse: true,
+			};
+		}
+
+		// Validate event type matches.
+		// SendSeven's delivered webhook envelope keys the event on the top-level
+		// `type` field (NOT `event`). Falling back to `body.event` keeps the node
+		// resilient if the envelope shape ever changes.
+		const receivedEvent = (body.type || body.event) as string;
 		if (receivedEvent !== event) {
 			// Ignore events that don't match
 			return {
@@ -245,7 +285,7 @@ export class SendSevenTrigger implements INodeType {
 					message: formatMessageResponse(message),
 					contact: contact.id ? formatContactResponse(contact) : null,
 					conversation: conversation.id ? formatConversationResponse(conversation) : null,
-					timestamp: body.timestamp,
+					timestamp: (body.created_at || body.timestamp),
 				};
 				break;
 			}
@@ -262,7 +302,7 @@ export class SendSevenTrigger implements INodeType {
 					event: receivedEvent,
 					conversation: formatConversationResponse(conversation),
 					contact: contact.id ? formatContactResponse(contact) : null,
-					timestamp: body.timestamp,
+					timestamp: (body.created_at || body.timestamp),
 				};
 				break;
 			}
@@ -276,7 +316,7 @@ export class SendSevenTrigger implements INodeType {
 					id: contact.id || body.event_id,
 					event: receivedEvent,
 					contact: formatContactResponse(contact),
-					timestamp: body.timestamp,
+					timestamp: (body.created_at || body.timestamp),
 				};
 				break;
 			}
@@ -296,7 +336,7 @@ export class SendSevenTrigger implements INodeType {
 					email,
 					contact: contact.id ? formatContactResponse(contact) : null,
 					conversation: conversation.id ? formatConversationResponse(conversation) : null,
-					timestamp: body.timestamp,
+					timestamp: (body.created_at || body.timestamp),
 				};
 				break;
 			}
@@ -306,7 +346,7 @@ export class SendSevenTrigger implements INodeType {
 					id: body.event_id,
 					event: receivedEvent,
 					data,
-					timestamp: body.timestamp,
+					timestamp: (body.created_at || body.timestamp),
 				};
 				break;
 			}
@@ -327,7 +367,7 @@ export class SendSevenTrigger implements INodeType {
 						failedCount: campaign.failed_count,
 						sentAt: campaign.sent_at,
 					},
-					timestamp: body.timestamp,
+					timestamp: (body.created_at || body.timestamp),
 				};
 				break;
 			}
@@ -338,7 +378,7 @@ export class SendSevenTrigger implements INodeType {
 					id: body.event_id,
 					event: receivedEvent,
 					data,
-					timestamp: body.timestamp,
+					timestamp: (body.created_at || body.timestamp),
 					raw: body,
 				};
 		}
