@@ -812,8 +812,8 @@ export class SendSeven implements INodeType {
 				description: 'Select the WhatsApp Business channel',
 			},
 			{
-				displayName: 'Recipient Phone',
-				name: 'recipientPhone',
+				displayName: 'Contact ID',
+				name: 'templateContactId',
 				type: 'string',
 				displayOptions: {
 					show: {
@@ -823,8 +823,8 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'Recipient phone number with country code',
-				placeholder: '+1234567890',
+				description:
+					'The contact to send the template to. The WhatsApp template send endpoint is contact-keyed (use the Contact resource Search/Create to obtain an ID).',
 			},
 			{
 				displayName: 'Template',
@@ -845,23 +845,6 @@ export class SendSeven implements INodeType {
 				description: 'Select the WhatsApp template to send',
 			},
 			{
-				displayName: 'Language',
-				name: 'templateLanguage',
-				type: 'options',
-				typeOptions: {
-					loadOptionsMethod: 'getTemplateLanguages',
-					loadOptionsDependsOn: ['waChannelId', 'templateName'],
-				},
-				displayOptions: {
-					show: {
-						resource: ['whatsappTemplate'],
-						operation: ['send'],
-					},
-				},
-				default: 'en',
-				description: 'Select the template language',
-			},
-			{
 				displayName: 'Template Variables',
 				name: 'templateVariables',
 				type: 'fixedCollection',
@@ -876,7 +859,8 @@ export class SendSeven implements INodeType {
 				},
 				default: {},
 				placeholder: 'Add Variable',
-				description: 'Template variable values ({{1}}, {{2}}, etc.)',
+				description:
+					'Positional template variable values ({{1}}, {{2}}, ...). Sent in order as variable_values. For NAMED templates, use the Additional Options -> Variable Values (JSON) field instead.',
 				options: [
 					{
 						name: 'variables',
@@ -890,6 +874,45 @@ export class SendSeven implements INodeType {
 								description: 'Variable value',
 							},
 						],
+					},
+				],
+			},
+			{
+				displayName: 'Additional Options',
+				name: 'templateAdditionalOptions',
+				type: 'collection',
+				placeholder: 'Add Option',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: ['whatsappTemplate'],
+						operation: ['send'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Conversation ID',
+						name: 'conversationId',
+						type: 'string',
+						default: '',
+						description:
+							'Link to an existing conversation (a new one is created if omitted). Also disambiguates a template name shared across channels/languages.',
+					},
+					{
+						displayName: 'Header Media URL',
+						name: 'headerMediaUrl',
+						type: 'string',
+						default: '',
+						description:
+							'Header media for IMAGE/VIDEO/DOCUMENT templates. Accepts an attachment ID (UUID) or an https URL.',
+					},
+					{
+						displayName: 'Variable Values (JSON)',
+						name: 'variableValuesJson',
+						type: 'json',
+						default: '',
+						description:
+							'Advanced: override variable_values with a raw JSON object for NAMED templates, e.g. {"first_name": "John"}. Takes precedence over the positional Template Variables above.',
 					},
 				],
 			},
@@ -1065,7 +1088,8 @@ export class SendSeven implements INodeType {
 				}
 
 				const response = await sendSevenApiRequest.call(this, 'GET', endpoint);
-				const templates = (response as IDataObject).items as IDataObject[] || response as IDataObject[];
+				// GET /whatsapp-templates returns { templates, total, channel_id, status_filter }
+				const templates = (response as IDataObject).templates as IDataObject[] || response as IDataObject[];
 
 				// Group templates by name, show only approved
 				const templateMap = new Map<string, string[]>();
@@ -1085,35 +1109,6 @@ export class SendSeven implements INodeType {
 					name: `${name} (${languages.join(', ')})`,
 					value: name,
 				}));
-			},
-
-			/**
-			 * Get available languages for a template
-			 */
-			async getTemplateLanguages(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-				const channelId = this.getCurrentNodeParameter('waChannelId') as string;
-				const templateName = this.getCurrentNodeParameter('templateName') as string;
-
-				if (!templateName) {
-					return [{ name: 'English', value: 'en' }];
-				}
-
-				let endpoint = '/whatsapp-templates';
-				if (channelId) {
-					endpoint += `?channel_id=${channelId}`;
-				}
-
-				const response = await sendSevenApiRequest.call(this, 'GET', endpoint);
-				const templates = (response as IDataObject).items as IDataObject[] || response as IDataObject[];
-
-				const languages = templates
-					.filter((t) => t.name === templateName && t.status === 'APPROVED')
-					.map((t) => ({
-						name: t.language as string,
-						value: t.language as string,
-					}));
-
-				return languages.length > 0 ? languages : [{ name: 'English', value: 'en' }];
 			},
 		},
 	};
@@ -1235,9 +1230,11 @@ export class SendSeven implements INodeType {
 						const email = this.getNodeParameter('email', i, '') as string;
 						const phone = this.getNodeParameter('phone', i, '') as string;
 
-						if (searchQuery) query.search = searchQuery;
-						if (email) query.email = email;
-						if (phone) query.phone = phone;
+						// GET /contacts supports only a single `search` param (no `email`/`phone`
+						// filters — FastAPI silently drops unknown query params). Funnel the most
+						// specific value into `search` (precedence: search > email > phone).
+						const searchValue = searchQuery || email || phone;
+						if (searchValue) query.search = searchValue;
 
 						if (returnAll) {
 							responseData = await sendSevenApiRequestAllItems.call(this, '/contacts', query);
@@ -1373,8 +1370,10 @@ export class SendSeven implements INodeType {
 
 						if (filters.contactId) query.contact_id = filters.contactId;
 						if (filters.status) query.status = filters.status;
-						if (filters.channelType) query.channel_type = filters.channelType;
 						if (filters.needsReply) query.needs_reply = filters.needsReply;
+						// NOTE: GET /conversations has NO `channel_type` filter (FastAPI drops
+						// unknown query params). When a Channel Type filter is set we fetch and
+						// filter client-side below instead of sending a no-op query param.
 
 						if (returnAll) {
 							responseData = await sendSevenApiRequestAllItems.call(this, '/conversations', query);
@@ -1383,6 +1382,13 @@ export class SendSeven implements INodeType {
 							query.page_size = limit;
 							const response = await sendSevenApiRequest.call(this, 'GET', '/conversations', {}, query);
 							responseData = (response as IDataObject).items as IDataObject[] || response;
+						}
+
+						// Client-side channel_type filter (backend cannot filter on it).
+						if (filters.channelType) {
+							responseData = (responseData as IDataObject[]).filter(
+								(c) => c.channel_type === filters.channelType,
+							);
 						}
 
 						responseData = (responseData as IDataObject[]).map(formatConversationResponse);
@@ -1424,50 +1430,47 @@ export class SendSeven implements INodeType {
 				// ==================== WHATSAPP TEMPLATE ====================
 				else if (resource === 'whatsappTemplate') {
 					if (operation === 'send') {
-						const channelId = this.getNodeParameter('waChannelId', i) as string;
-						const to = this.getNodeParameter('recipientPhone', i) as string;
+						const contactId = this.getNodeParameter('templateContactId', i) as string;
 						const templateName = this.getNodeParameter('templateName', i) as string;
-						const templateLanguage = this.getNodeParameter('templateLanguage', i, 'en') as string;
 						const variablesData = this.getNodeParameter('templateVariables', i, {}) as IDataObject;
+						const additionalOptions = this.getNodeParameter('templateAdditionalOptions', i, {}) as IDataObject;
 
-						validateRequiredFields(this, { channelId, to, templateName }, ['channelId', 'to', 'templateName']);
+						validateRequiredFields(this, { contactId, templateName }, ['contactId', 'templateName']);
 
-						// Build template content
-						const content: IDataObject = {
-							type: 'template',
-							template: {
-								name: templateName,
-								language: {
-									code: templateLanguage,
-								},
-							},
-						};
+						// Build the contact-keyed SendTemplateRequest body.
+						// The dedicated send endpoint takes variable_values (List|Dict),
+						// NOT the deprecated Meta-style `content` wrapper on POST /messages.
+						const body: IDataObject = { contact_id: contactId };
 
-						// Add variables if provided
+						// Positional variables -> ordered list of strings.
 						const variables = (variablesData.variables as IDataObject[]) || [];
 						if (variables.length > 0) {
-							(content.template as IDataObject).components = [
-								{
-									type: 'body',
-									parameters: variables.map((v) => ({
-										type: 'text',
-										text: String(v.value),
-									})),
-								},
-							];
+							body.variable_values = variables.map((v) => String(v.value));
 						}
 
-						const body: IDataObject = {
-							to,
-							channel_id: channelId,
-							content,
-						};
+						// Advanced JSON override (for NAMED templates) wins over positional.
+						if (additionalOptions.variableValuesJson) {
+							const raw = additionalOptions.variableValuesJson;
+							body.variable_values = typeof raw === 'string' ? JSON.parse(raw) : raw;
+						}
 
-						responseData = await sendSevenApiRequest.call(this, 'POST', '/messages', body);
+						if (additionalOptions.conversationId) {
+							body.conversation_id = additionalOptions.conversationId as string;
+						}
+						if (additionalOptions.headerMediaUrl) {
+							body.header_media_url = additionalOptions.headerMediaUrl as string;
+						}
+
+						// Template name (or DB UUID) goes in the path; URL-encode for safety.
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'POST',
+							`/whatsapp-templates/${encodeURIComponent(templateName)}/send`,
+							body,
+						);
 						responseData = {
-							...formatMessageResponse(responseData as IDataObject),
+							...(responseData as IDataObject),
 							templateName,
-							templateLanguage,
 							variablesSent: variables.length,
 						};
 					}
@@ -1482,7 +1485,8 @@ export class SendSeven implements INodeType {
 						}
 
 						if (returnAll) {
-							responseData = await sendSevenApiRequestAllItems.call(this, endpoint);
+							// GET /whatsapp-templates envelope key is `templates`, not `items`.
+							responseData = await sendSevenApiRequestAllItems.call(this, endpoint, {}, 'templates');
 						} else {
 							const limit = this.getNodeParameter('limit', i, 50) as number;
 							const response = await sendSevenApiRequest.call(
@@ -1492,7 +1496,7 @@ export class SendSeven implements INodeType {
 								{},
 								{ page_size: limit },
 							);
-							responseData = (response as IDataObject).items as IDataObject[] || response;
+							responseData = (response as IDataObject).templates as IDataObject[] || response;
 						}
 					}
 				}
