@@ -25,3 +25,4 @@ npm-debug.log*
 
 # Package lock (use npm ci in production)
 # package-lock.json
+.npmrc

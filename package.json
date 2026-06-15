@@ -26,11 +26,11 @@
   },
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && gulp build:icons",
+    "build": "tsc && node scripts/copy-icons.js",
     "dev": "tsc --watch",
     "format": "prettier nodes credentials --write",
-    "lint": "eslint nodes credentials package.json",
-    "lintfix": "eslint nodes credentials package.json --fix",
+    "lint": "eslint nodes credentials",
+    "lintfix": "eslint nodes credentials --fix",
     "prepublishOnly": "npm run build"
   },
   "files": [
@@ -48,15 +48,18 @@
     ]
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@typescript-eslint/parser": "^6.13.0",
-    "eslint": "^8.55.0",
-    "gulp": "^4.0.2",
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^20.19.43",
+    "eslint": "^9.39.4",
     "n8n-workflow": "^1.20.0",
-    "prettier": "^3.1.0",
-    "typescript": "^5.3.2"
+    "prettier": "^3.8.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.61.0"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
+  },
+  "overrides": {
+    "form-data": "^4.0.4"
   }
 }
