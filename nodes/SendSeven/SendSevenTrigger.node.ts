@@ -135,7 +135,21 @@ export class SendSevenTrigger implements INodeType {
 
 					return false;
 				} catch (error) {
-					return false;
+					// A genuine 404 means the webhook-endpoints resource was not found
+					// (no existing subscription) — safe to report "does not exist" so a
+					// new one is created. Any other error (auth failure, API down, etc.)
+					// must be surfaced; otherwise n8n proceeds to create() and registers a
+					// duplicate webhook on every activation.
+					const err = error as IDataObject;
+					const httpCode = err.httpCode || err.statusCode;
+					if (String(httpCode) === '404') {
+						return false;
+					}
+					throw new NodeApiError(this.getNode(), error as JsonObject, {
+						message: 'Failed to check existing SendSeven webhook subscriptions',
+						description:
+							'SendSeven could not be queried for existing webhook subscriptions. The API token may be invalid or missing the "webhooks:read" scope, or the API may be unreachable. Resolve this before activating the workflow to avoid duplicate webhook registrations.',
+					});
 				}
 			},
 

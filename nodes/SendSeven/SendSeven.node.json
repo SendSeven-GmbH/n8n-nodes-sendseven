@@ -1,5 +1,5 @@
 {
-  "node": "n8n-nodes-base.sendSeven",
+  "node": "n8n-nodes-sendseven.sendSeven",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
   "categories": ["Communication", "Marketing & Content"],
@@ -15,8 +15,5 @@
       }
     ]
   },
-  "alias": ["messaging", "whatsapp", "telegram", "sms", "email", "chat", "omnichannel"],
-  "subcategories": {
-    "Communication": ["SMS & Messaging"]
-  }
+  "alias": ["messaging", "whatsapp", "telegram", "sms", "email", "chat", "omnichannel"]
 }

@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-sendseven",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "n8n community node for SendSeven - Unified Messaging API Platform",
   "keywords": [
     "n8n-community-node-package",
@@ -58,8 +58,5 @@
   },
   "peerDependencies": {
     "n8n-workflow": "*"
-  },
-  "overrides": {
-    "form-data": "^4.0.4"
   }
 }
