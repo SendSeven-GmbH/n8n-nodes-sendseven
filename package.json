@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-sendseven",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "n8n community node for SendSeven - Unified Messaging API Platform",
   "keywords": [
     "n8n-community-node-package",

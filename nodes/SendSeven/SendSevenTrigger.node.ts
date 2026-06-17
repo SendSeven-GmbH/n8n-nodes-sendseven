@@ -39,7 +39,7 @@ export class SendSevenTrigger implements INodeType {
 		icon: 'file:sendseven.svg',
 		group: ['trigger'],
 		version: 1,
-		description: 'Triggers when SendSeven events occur (messages, conversations, contacts)',
+		description: 'Send and receive WhatsApp Business API, Instagram, Telegram, Email etc. messages in a unified API',
 		defaults: {
 			name: 'SendSeven Trigger',
 		},
