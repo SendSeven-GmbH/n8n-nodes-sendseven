@@ -34,14 +34,14 @@ import {
  */
 export class SendSevenTrigger implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'SendSeven Trigger',
+		displayName: 'SendSeven.com',
 		name: 'sendSevenTrigger',
 		icon: 'file:sendseven.svg',
 		group: ['trigger'],
 		version: 1,
 		description: 'Send and receive WhatsApp Business API, Instagram, Telegram, Email etc. messages in a unified API',
 		defaults: {
-			name: 'SendSeven Trigger',
+			name: 'SendSeven.com',
 		},
 		inputs: [],
 		outputs: ['main'],
