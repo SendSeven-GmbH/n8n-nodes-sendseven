@@ -48,7 +48,13 @@ npm install n8n-nodes-sendseven
 - **Assign**: Assign a conversation to a team member
 
 #### WhatsApp Template
-- **Send**: Send a pre-approved WhatsApp template message
+- **Send**: Send a pre-approved WhatsApp template message. Provide **at least one recipient** (Contact ID is no longer mandatory):
+  - **Contact ID** — a contact; uses its first WhatsApp method, phone as fallback.
+  - **WhatsApp ID** — a phone number without a leading `+` (stripped automatically) or an alphanumeric WhatsApp ID; matches an existing contact or creates one (ideal for stateless integrations).
+  - **Contact Method ID** (Additional Options) — target a specific WhatsApp number when a contact has several; must be a `whatsapp_id`-type method. If Contact ID is also set it must name the same contact.
+  - **Conversation ID** (Additional Options) — send within an existing WhatsApp conversation.
+
+  Additional Options also expose **Channel ID** (disambiguates a template referenced by NAME across channels, and selects the sending channel when only a WhatsApp ID is given), **Language** (Meta locale code such as `en`, `de`, `en_US`, `pt_BR` — needed only when a template name exists in multiple languages; auto-resolved from the contact's preferred language otherwise), **Header Media URL**, **Header Document Filename**, and **Variable Values (JSON)**.
 - **List**: List available WhatsApp templates
 
 #### Attachment

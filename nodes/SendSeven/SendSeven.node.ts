@@ -7,6 +7,7 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 
 import {
 	sendSevenApiRequest,
@@ -822,9 +823,23 @@ export class SendSeven implements INodeType {
 					},
 				},
 				default: '',
-				required: true,
+				required: false,
 				description:
-					'The contact to send the template to. The WhatsApp template send endpoint is contact-keyed (use the Contact resource Search/Create to obtain an ID).',
+					'The contact to send the template to (uses its first WhatsApp method, phone as fallback). Optional: provide at least ONE recipient — Contact ID, WhatsApp ID, Contact Method ID (in Additional Options), or Conversation ID (in Additional Options). Use the Contact resource Search/Create to obtain an ID.',
+			},
+			{
+				displayName: 'WhatsApp ID',
+				name: 'templateWhatsappId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['whatsappTemplate'],
+						operation: ['send'],
+					},
+				},
+				default: '',
+				description:
+					'Send straight to a phone number (without a leading "+", which is stripped automatically) OR an alphanumeric WhatsApp ID. An existing contact is matched, or a new one is created. Great for stateless integrations. Alternative to Contact ID.',
 			},
 			{
 				displayName: 'Template',
@@ -891,12 +906,36 @@ export class SendSeven implements INodeType {
 				},
 				options: [
 					{
+						displayName: 'Channel ID',
+						name: 'channelId',
+						type: 'string',
+						default: '',
+						description:
+							'Disambiguates a template referenced by NAME when it exists on multiple channels; also selects the sending channel when only a WhatsApp ID is given. Must not conflict with the template\'s own channel (the API rejects a mismatch). Leave empty to let the first matching channel win.',
+					},
+					{
+						displayName: 'Contact Method ID',
+						name: 'contactMethodId',
+						type: 'string',
+						default: '',
+						description:
+							'Target a SPECIFIC WhatsApp number when a contact has several. Must be a whatsapp_id-type contact method. Pins both the recipient number and its contact; if Contact ID is also set it must name the same contact. Alternative to Contact ID / WhatsApp ID.',
+					},
+					{
 						displayName: 'Conversation ID',
 						name: 'conversationId',
 						type: 'string',
 						default: '',
 						description:
-							'Link to an existing conversation (a new one is created if omitted). Also disambiguates a template name shared across channels/languages.',
+							'Send within an existing WhatsApp conversation (must be a WhatsApp conversation). Alternative to the other recipient fields.',
+					},
+					{
+						displayName: 'Header Document Filename',
+						name: 'headerDocumentFilename',
+						type: 'string',
+						default: '',
+						description:
+							'Filename shown to the recipient for DOCUMENT-header templates (e.g. "invoice.pdf"). Used together with Header Media URL.',
 					},
 					{
 						displayName: 'Header Media URL',
@@ -905,6 +944,14 @@ export class SendSeven implements INodeType {
 						default: '',
 						description:
 							'Header media for IMAGE/VIDEO/DOCUMENT templates. Accepts an attachment ID (UUID) or an https URL.',
+					},
+					{
+						displayName: 'Language',
+						name: 'language',
+						type: 'string',
+						default: '',
+						description:
+							'Meta language/locale code (e.g. en, de, en_US, pt_BR). Needed only when a template NAME exists in multiple languages. If omitted, the API auto-resolves from the recipient contact\'s preferred language and errors if it cannot.',
 					},
 					{
 						displayName: 'Variable Values (JSON)',
@@ -1430,17 +1477,53 @@ export class SendSeven implements INodeType {
 				// ==================== WHATSAPP TEMPLATE ====================
 				else if (resource === 'whatsappTemplate') {
 					if (operation === 'send') {
-						const contactId = this.getNodeParameter('templateContactId', i) as string;
+						const contactId = this.getNodeParameter('templateContactId', i, '') as string;
+						const whatsappId = this.getNodeParameter('templateWhatsappId', i, '') as string;
 						const templateName = this.getNodeParameter('templateName', i) as string;
 						const variablesData = this.getNodeParameter('templateVariables', i, {}) as IDataObject;
 						const additionalOptions = this.getNodeParameter('templateAdditionalOptions', i, {}) as IDataObject;
 
-						validateRequiredFields(this, { contactId, templateName }, ['contactId', 'templateName']);
+						const contactMethodId = (additionalOptions.contactMethodId as string) || '';
+						const conversationId = (additionalOptions.conversationId as string) || '';
 
-						// Build the contact-keyed SendTemplateRequest body.
+						// Template name/UUID is always required.
+						validateRequiredFields(this, { templateName }, ['templateName']);
+
+						// At least ONE recipient must be provided (contact_id is no longer required).
+						if (!contactId && !contactMethodId && !whatsappId && !conversationId) {
+							throw new NodeOperationError(
+								this.getNode(),
+								'Provide at least one recipient: Contact, Contact Method ID, WhatsApp ID, or Conversation ID',
+								{ itemIndex: i },
+							);
+						}
+
+						// Build the SendTemplateRequest body.
 						// The dedicated send endpoint takes variable_values (List|Dict),
 						// NOT the deprecated Meta-style `content` wrapper on POST /messages.
-						const body: IDataObject = { contact_id: contactId };
+						// Each recipient/selector field is included ONLY when non-empty.
+						const body: IDataObject = {};
+
+						if (contactId) {
+							body.contact_id = contactId;
+						}
+						if (contactMethodId) {
+							body.contact_method_id = contactMethodId;
+						}
+						if (whatsappId) {
+							body.whatsapp_id = whatsappId;
+						}
+						if (conversationId) {
+							body.conversation_id = conversationId;
+						}
+
+						// Optional channel/language selectors for NAME-referenced templates.
+						if (additionalOptions.channelId) {
+							body.channel_id = additionalOptions.channelId as string;
+						}
+						if (additionalOptions.language) {
+							body.language = additionalOptions.language as string;
+						}
 
 						// Positional variables -> ordered list of strings.
 						const variables = (variablesData.variables as IDataObject[]) || [];
@@ -1454,11 +1537,11 @@ export class SendSeven implements INodeType {
 							body.variable_values = typeof raw === 'string' ? JSON.parse(raw) : raw;
 						}
 
-						if (additionalOptions.conversationId) {
-							body.conversation_id = additionalOptions.conversationId as string;
-						}
 						if (additionalOptions.headerMediaUrl) {
 							body.header_media_url = additionalOptions.headerMediaUrl as string;
+						}
+						if (additionalOptions.headerDocumentFilename) {
+							body.header_document_filename = additionalOptions.headerDocumentFilename as string;
 						}
 
 						// Template name (or DB UUID) goes in the path; URL-encode for safety.
