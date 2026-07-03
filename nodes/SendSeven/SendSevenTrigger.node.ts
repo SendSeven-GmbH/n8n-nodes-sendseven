@@ -355,6 +355,32 @@ export class SendSevenTrigger implements INodeType {
 				break;
 			}
 
+			case 'conversation.transcript.created': {
+				// Transcript export finished — surface the download URL and metadata
+				// so a downstream node (e.g. HTTP Request) can fetch the PDF/ZIP and
+				// store it elsewhere. NOTE: `downloadUrl` is a short-lived signed URL;
+				// if the workflow runs after it expires, re-fetch a fresh URL via
+				// `pollUrl` (GET /conversations/{id}/transcript/{job_id}).
+				const conversation = data.conversation as IDataObject || {};
+
+				formattedData = {
+					id: (data.job_id as string) || body.event_id,
+					event: receivedEvent,
+					jobId: data.job_id,
+					conversationId: data.conversation_id,
+					contactId: data.contact_id,
+					format: data.format,
+					downloadUrl: data.download_url,
+					downloadUrlExpiresAt: data.download_url_expires_at,
+					downloadUrlExpiresInMinutes: data.download_url_expires_in_minutes,
+					pollUrl: data.poll_url,
+					filename: data.filename,
+					conversation: conversation.id ? formatConversationResponse(conversation) : null,
+					timestamp: (body.created_at || body.timestamp),
+				};
+				break;
+			}
+
 			case 'link.clicked': {
 				formattedData = {
 					id: body.event_id,

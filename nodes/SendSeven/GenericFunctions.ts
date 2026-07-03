@@ -270,6 +270,7 @@ export const WEBHOOK_EVENTS = [
 	{ name: 'Conversation Closed', value: 'conversation.closed' },
 	{ name: 'Conversation Assigned', value: 'conversation.assigned' },
 	{ name: 'Conversation Reopened', value: 'conversation.reopened' },
+	{ name: 'Conversation Transcript Created', value: 'conversation.transcript.created' },
 	{ name: 'Contact Created', value: 'contact.created' },
 	{ name: 'Contact Updated', value: 'contact.updated' },
 	{ name: 'Contact Deleted', value: 'contact.deleted' },
