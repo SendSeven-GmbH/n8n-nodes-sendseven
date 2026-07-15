@@ -15,5 +15,38 @@
       }
     ]
   },
-  "alias": ["messaging", "whatsapp", "telegram", "sms", "email", "chat", "omnichannel"]
+  "alias": [
+    "whatsapp",
+    "whatsapp business",
+    "whatsapp business api",
+    "whatsapp cloud api",
+    "meta whatsapp",
+    "telegram",
+    "sms",
+    "text message",
+    "email",
+    "facebook messenger",
+    "messenger",
+    "instagram",
+    "instagram dm",
+    "omnichannel",
+    "unified messaging",
+    "business messaging",
+    "messaging",
+    "chat",
+    "send message",
+    "send whatsapp",
+    "send sms",
+    "whatsapp template",
+    "message template",
+    "contacts",
+    "contact management",
+    "conversations",
+    "shared inbox",
+    "team inbox",
+    "customer support",
+    "customer communication",
+    "newsletter",
+    "email marketing"
+  ]
 }

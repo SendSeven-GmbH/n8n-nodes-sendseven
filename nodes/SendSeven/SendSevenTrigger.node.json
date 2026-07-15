@@ -1,0 +1,44 @@
+{
+  "node": "n8n-nodes-sendseven.sendSevenTrigger",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Communication", "Marketing & Content"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://sendseven.com/docs/api/authentication"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://sendseven.com/docs/integrations/n8n"
+      }
+    ]
+  },
+  "alias": [
+    "whatsapp",
+    "whatsapp trigger",
+    "whatsapp webhook",
+    "incoming whatsapp",
+    "receive whatsapp",
+    "incoming message",
+    "message received",
+    "new message",
+    "sms trigger",
+    "telegram trigger",
+    "messenger trigger",
+    "instagram trigger",
+    "email received",
+    "email trigger",
+    "new conversation",
+    "conversation closed",
+    "conversation trigger",
+    "new contact",
+    "contact updated",
+    "link clicked",
+    "webhook",
+    "messaging trigger",
+    "omnichannel trigger",
+    "customer message"
+  ]
+}
