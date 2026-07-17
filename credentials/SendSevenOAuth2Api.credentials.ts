@@ -1,4 +1,4 @@
-import type { ICredentialType, INodeProperties } from 'n8n-workflow';
+import type { ICredentialType, INodeProperties, Icon } from 'n8n-workflow';
 
 /**
  * SendSeven OAuth2 Credentials
@@ -20,6 +20,7 @@ export class SendSevenOAuth2Api implements ICredentialType {
 	name = 'sendSevenOAuth2Api';
 	displayName = 'SendSeven OAuth2 API';
 	documentationUrl = 'https://docs.sendseven.com/guides/integrations/n8n';
+	icon: Icon = 'file:../nodes/SendSeven/sendseven.svg';
 	extends = ['oAuth2Api'];
 
 	properties: INodeProperties[] = [

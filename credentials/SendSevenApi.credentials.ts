@@ -3,6 +3,7 @@ import type {
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
+	Icon,
 } from 'n8n-workflow';
 
 /**
@@ -17,6 +18,7 @@ export class SendSevenApi implements ICredentialType {
 	name = 'sendSevenApi';
 	displayName = 'SendSeven API';
 	documentationUrl = 'https://docs.sendseven.com/guides/integrations/n8n';
+	icon: Icon = 'file:../nodes/SendSeven/sendseven.svg';
 
 	properties: INodeProperties[] = [
 		{

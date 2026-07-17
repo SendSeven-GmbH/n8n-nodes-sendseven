@@ -7,7 +7,7 @@ import type {
 	IWebhookResponseData,
 	JsonObject,
 } from 'n8n-workflow';
-import { NodeApiError } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes } from 'n8n-workflow';
 
 import {
 	sendSevenApiRequest,
@@ -34,17 +34,18 @@ import {
  */
 export class SendSevenTrigger implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'SendSeven.com',
+		displayName: 'SendSeven Trigger',
 		name: 'sendSevenTrigger',
 		icon: 'file:sendseven.svg',
 		group: ['trigger'],
 		version: 1,
+		subtitle: '={{$parameter["event"]}}',
 		description: 'Send and receive WhatsApp Business API, Instagram, Telegram, Email etc. messages in a unified API',
 		defaults: {
-			name: 'SendSeven.com',
+			name: 'SendSeven Trigger',
 		},
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'sendSevenApi',
@@ -103,6 +104,7 @@ export class SendSevenTrigger implements INodeType {
 				description: 'The event to listen for',
 			},
 		],
+		usableAsTool: true,
 	};
 
 	webhookMethods = {

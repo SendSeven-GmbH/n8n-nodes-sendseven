@@ -6,8 +6,9 @@ import type {
 	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
+	JsonObject,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import {
 	sendSevenApiRequest,
@@ -55,8 +56,8 @@ export class SendSeven implements INodeType {
 		defaults: {
 			name: 'SendSeven',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'sendSevenApi',
@@ -103,8 +104,8 @@ export class SendSeven implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
-						name: 'Message',
-						value: 'message',
+						name: 'Attachment',
+						value: 'attachment',
 					},
 					{
 						name: 'Contact',
@@ -115,12 +116,12 @@ export class SendSeven implements INodeType {
 						value: 'conversation',
 					},
 					{
-						name: 'WhatsApp Template',
-						value: 'whatsappTemplate',
+						name: 'Message',
+						value: 'message',
 					},
 					{
-						name: 'Attachment',
-						value: 'attachment',
+						name: 'WhatsApp Template',
+						value: 'whatsappTemplate',
 					},
 				],
 				default: 'message',
@@ -159,34 +160,10 @@ export class SendSeven implements INodeType {
 				},
 				options: [
 					{
-						name: 'Create',
-						value: 'create',
-						description: 'Create a new contact',
-						action: 'Create a contact',
-					},
-					{
-						name: 'Update',
-						value: 'update',
-						description: 'Update an existing contact',
-						action: 'Update a contact',
-					},
-					{
-						name: 'Get',
-						value: 'get',
-						description: 'Get a contact by ID',
-						action: 'Get a contact',
-					},
-					{
-						name: 'Search',
-						value: 'search',
-						description: 'Search for contacts',
-						action: 'Search contacts',
-					},
-					{
-						name: 'Delete',
-						value: 'delete',
-						description: 'Delete a contact (GDPR delete)',
-						action: 'Delete a contact',
+						name: 'Add Method',
+						value: 'addMethod',
+						description: 'Add a contact method (platform ID) to a contact',
+						action: 'Add method to contact',
 					},
 					{
 						name: 'Add Tag',
@@ -195,10 +172,40 @@ export class SendSeven implements INodeType {
 						action: 'Add tag to contact',
 					},
 					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a new contact',
+						action: 'Create a contact',
+					},
+					{
+						name: 'Delete',
+						value: 'delete',
+						description: 'Delete a contact (GDPR delete)',
+						action: 'Delete a contact',
+					},
+					{
+						name: 'Delete Method',
+						value: 'deleteMethod',
+						description: 'Delete a contact method from a contact',
+						action: 'Delete method from contact',
+					},
+					{
+						name: 'Get',
+						value: 'get',
+						description: 'Get a contact by ID',
+						action: 'Get a contact',
+					},
+					{
 						name: 'Remove Tag',
 						value: 'removeTag',
 						description: 'Remove a tag from a contact',
 						action: 'Remove tag from contact',
+					},
+					{
+						name: 'Search',
+						value: 'search',
+						description: 'Search for contacts',
+						action: 'Search contacts',
 					},
 					{
 						name: 'Set Custom Field',
@@ -207,16 +214,10 @@ export class SendSeven implements INodeType {
 						action: 'Set custom field on contact',
 					},
 					{
-						name: 'Add Method',
-						value: 'addMethod',
-						description: 'Add a contact method (platform ID) to a contact',
-						action: 'Add method to contact',
-					},
-					{
-						name: 'Delete Method',
-						value: 'deleteMethod',
-						description: 'Delete a contact method from a contact',
-						action: 'Delete method from contact',
+						name: 'Update',
+						value: 'update',
+						description: 'Update an existing contact',
+						action: 'Update a contact',
 					},
 				],
 				default: 'create',
@@ -234,6 +235,18 @@ export class SendSeven implements INodeType {
 				},
 				options: [
 					{
+						name: 'Assign',
+						value: 'assign',
+						description: 'Assign a conversation to a user',
+						action: 'Assign a conversation',
+					},
+					{
+						name: 'Close',
+						value: 'close',
+						description: 'Close a conversation',
+						action: 'Close a conversation',
+					},
+					{
 						name: 'Get',
 						value: 'get',
 						description: 'Get a conversation by ID',
@@ -244,18 +257,6 @@ export class SendSeven implements INodeType {
 						value: 'search',
 						description: 'Search for conversations',
 						action: 'Search conversations',
-					},
-					{
-						name: 'Close',
-						value: 'close',
-						description: 'Close a conversation',
-						action: 'Close a conversation',
-					},
-					{
-						name: 'Assign',
-						value: 'assign',
-						description: 'Assign a conversation to a user',
-						action: 'Assign a conversation',
 					},
 				],
 				default: 'get',
@@ -273,16 +274,16 @@ export class SendSeven implements INodeType {
 				},
 				options: [
 					{
-						name: 'Send',
-						value: 'send',
-						description: 'Send a WhatsApp template message',
-						action: 'Send WhatsApp template',
-					},
-					{
 						name: 'List',
 						value: 'list',
 						description: 'List available WhatsApp templates',
-						action: 'List WhatsApp templates',
+						action: 'List whatsapp templates',
+					},
+					{
+						name: 'Send',
+						value: 'send',
+						description: 'Send a WhatsApp template message',
+						action: 'Send whatsapp template',
 					},
 				],
 				default: 'send',
@@ -306,7 +307,7 @@ export class SendSeven implements INodeType {
 						action: 'Upload an attachment',
 					},
 					{
-						name: 'Upload from URL',
+						name: 'Upload From URL',
 						value: 'uploadFromUrl',
 						description: 'Fetch a public URL and store it as an attachment',
 						action: 'Upload an attachment from URL',
@@ -328,9 +329,9 @@ export class SendSeven implements INodeType {
 				},
 				options: [
 					{
-						name: 'Recipient + Channel',
-						value: 'recipientChannel',
-						description: 'Send to a recipient identifier via a specific channel',
+						name: 'Contact ID + Channel',
+						value: 'contactChannel',
+						description: 'Send to a contact via a specific channel',
 					},
 					{
 						name: 'Conversation ID',
@@ -338,16 +339,16 @@ export class SendSeven implements INodeType {
 						description: 'Reply to an existing conversation',
 					},
 					{
-						name: 'Contact ID + Channel',
-						value: 'contactChannel',
-						description: 'Send to a contact via a specific channel',
+						name: 'Recipient + Channel',
+						value: 'recipientChannel',
+						description: 'Send to a recipient identifier via a specific channel',
 					},
 				],
 				default: 'recipientChannel',
 				description: 'How to address the message recipient',
 			},
 			{
-				displayName: 'Channel',
+				displayName: 'Channel Name or ID',
 				name: 'channelId',
 				type: 'options',
 				typeOptions: {
@@ -362,7 +363,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'Select the messaging channel (WhatsApp, Telegram, SMS, etc.)',
+				description: 'Select the messaging channel (WhatsApp, Telegram, SMS, etc.). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Recipient',
@@ -522,7 +523,7 @@ export class SendSeven implements INodeType {
 				description: 'Search contacts by name',
 			},
 			{
-				displayName: 'Tag',
+				displayName: 'Tag Name or ID',
 				name: 'tagId',
 				type: 'options',
 				typeOptions: {
@@ -536,7 +537,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'Select the tag to add to or remove from the contact',
+				description: 'Select the tag to add to or remove from the contact. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -584,7 +585,7 @@ export class SendSeven implements INodeType {
 			},
 			// ---- Set Custom Field ----
 			{
-				displayName: 'Custom Field',
+				displayName: 'Custom Field Name or ID',
 				name: 'customFieldId',
 				type: 'options',
 				typeOptions: {
@@ -598,7 +599,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'Select the custom field definition to set',
+				description: 'Select the custom field definition to set. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Value',
@@ -625,12 +626,12 @@ export class SendSeven implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Phone', value: 'phone' },
 					{ name: 'Email', value: 'email' },
-					{ name: 'WhatsApp ID', value: 'whatsapp_id' },
-					{ name: 'Telegram ID', value: 'telegram_id' },
-					{ name: 'Messenger ID', value: 'messenger_id' },
 					{ name: 'Instagram ID', value: 'instagram_id' },
+					{ name: 'Messenger ID', value: 'messenger_id' },
+					{ name: 'Phone', value: 'phone' },
+					{ name: 'Telegram ID', value: 'telegram_id' },
+					{ name: 'WhatsApp ID', value: 'whatsapp_id' },
 				],
 				default: 'phone',
 				required: true,
@@ -651,7 +652,7 @@ export class SendSeven implements INodeType {
 				description: 'The method value (phone number, email, or platform ID)',
 			},
 			{
-				displayName: 'Channel',
+				displayName: 'Channel Name or ID',
 				name: 'methodChannelId',
 				type: 'options',
 				typeOptions: {
@@ -666,7 +667,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'Channel this page-scoped method belongs to (required for Messenger/Instagram IDs)',
+				description: 'Channel this page-scoped method belongs to (required for Messenger/Instagram IDs). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			// ---- Delete Method ----
 			{
@@ -700,7 +701,7 @@ export class SendSeven implements INodeType {
 				description: 'The unique ID of the conversation',
 			},
 			{
-				displayName: 'User',
+				displayName: 'User Name or ID',
 				name: 'userId',
 				type: 'options',
 				typeOptions: {
@@ -714,7 +715,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'Select the user to assign the conversation to',
+				description: 'Select the user to assign the conversation to. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Close Options',
@@ -796,7 +797,7 @@ export class SendSeven implements INodeType {
 
 			// ==================== WHATSAPP TEMPLATE FIELDS ====================
 			{
-				displayName: 'WhatsApp Channel',
+				displayName: 'WhatsApp Channel Name or ID',
 				name: 'waChannelId',
 				type: 'options',
 				typeOptions: {
@@ -810,7 +811,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'Select the WhatsApp Business channel',
+				description: 'Select the WhatsApp Business channel. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Contact ID',
@@ -823,7 +824,6 @@ export class SendSeven implements INodeType {
 					},
 				},
 				default: '',
-				required: false,
 				description:
 					'The contact to send the template to (uses its first WhatsApp method, phone as fallback). Optional: provide at least ONE recipient — Contact ID, WhatsApp ID, Contact Method ID (in Additional Options), or Conversation ID (in Additional Options). Use the Contact resource Search/Create to obtain an ID.',
 			},
@@ -842,7 +842,7 @@ export class SendSeven implements INodeType {
 					'Send straight to a phone number (without a leading "+", which is stripped automatically) OR an alphanumeric WhatsApp ID. An existing contact is matched, or a new one is created. Great for stateless integrations. Alternative to Contact ID.',
 			},
 			{
-				displayName: 'Template',
+				displayName: 'Template Name or ID',
 				name: 'templateName',
 				type: 'options',
 				typeOptions: {
@@ -857,7 +857,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'Select the WhatsApp template to send',
+				description: 'Select the WhatsApp template to send. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Template Variables',
@@ -1042,7 +1042,7 @@ export class SendSeven implements INodeType {
 					},
 				},
 				default: false,
-				description: 'Whether to return all results or only up to a limit',
+				description: 'Whether to return all results or only up to a given limit',
 			},
 			{
 				displayName: 'Limit',
@@ -1063,6 +1063,7 @@ export class SendSeven implements INodeType {
 				description: 'Max number of results to return',
 			},
 		],
+		usableAsTool: true,
 	};
 
 	methods = {
@@ -1219,7 +1220,11 @@ export class SendSeven implements INodeType {
 						const phone = this.getNodeParameter('phone', i, '') as string;
 
 						if (!email && !phone) {
-							throw new Error('Either email or phone is required to create a contact');
+							throw new NodeOperationError(
+								this.getNode(),
+								'Either email or phone is required to create a contact',
+								{ itemIndex: i },
+							);
 						}
 
 						const body: IDataObject = {};
@@ -1630,17 +1635,22 @@ export class SendSeven implements INodeType {
 
 				// Add response to return data
 				if (Array.isArray(responseData)) {
-					returnData.push(...responseData.map((item) => ({ json: item })));
+					returnData.push(
+						...responseData.map((item) => ({ json: item, pairedItem: { item: i } })),
+					);
 				} else if (responseData) {
-					returnData.push({ json: responseData });
+					returnData.push({ json: responseData, pairedItem: { item: i } });
 				}
 
 			} catch (error) {
 				if (this.continueOnFail()) {
-					returnData.push({ json: { error: (error as Error).message } });
+					returnData.push({
+						json: { error: (error as Error).message },
+						pairedItem: { item: i },
+					});
 					continue;
 				}
-				throw error;
+				throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
 			}
 		}
 

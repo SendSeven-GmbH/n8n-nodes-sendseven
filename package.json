@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-sendseven",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Official SendSeven n8n integration for WhatsApp Business API, SMS, Telegram, Messenger, Instagram, and email automation — send and receive messages, manage contacts and conversations from one unified API.",
   "keywords": [
     "n8n-community-node-package",
