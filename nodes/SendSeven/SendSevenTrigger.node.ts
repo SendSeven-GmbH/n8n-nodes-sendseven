@@ -104,7 +104,6 @@ export class SendSevenTrigger implements INodeType {
 				description: 'The event to listen for',
 			},
 		],
-		usableAsTool: true,
 	};
 
 	webhookMethods = {
