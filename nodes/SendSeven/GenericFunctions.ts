@@ -337,6 +337,12 @@ export function formatMessageResponse(message: IDataObject): IDataObject {
 		from: message.from,
 		hasAttachments: !!(message.attachments as IDataObject[])?.length,
 		attachments: message.attachments,
+		// Additive: when more than one attachment was sent, POST /messages fans out into
+		// N messages (one attachment each, caption/text on the first). This message resource
+		// is always the first part; relatedMessageIds lists parts 2..N in wire order. Empty/
+		// undefined for ordinary single-part sends. See README "Sending a message with an
+		// attachment" for the fan-out behavior.
+		relatedMessageIds: message.related_message_ids,
 		createdAt: message.created_at,
 	};
 }

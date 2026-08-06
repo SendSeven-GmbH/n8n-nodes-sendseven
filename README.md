@@ -28,6 +28,7 @@ npm install n8n-nodes-sendseven
 #### Message
 - **Send**: Send a message through any channel (WhatsApp, Telegram, SMS, Email, etc.)
   - Supports **attachments**: provide a comma-separated list of attachment UUIDs (from the Attachment resource) in the **Attachment IDs** field. These map to the `attachments` array of `POST /messages`. Raw URLs are not accepted — upload first.
+  - **Multiple attachments are delivered as separate messages**, in the order listed, with the **Message Text** attached only to the first — except on an **Email** channel, where all attachments go out together as one email. Each attachment message is billed separately (the email exception is billed as one message). The output's new `relatedMessageIds` field lists the IDs of the additional messages (parts 2..N); it's empty for ordinary single-part sends.
 
 #### Contact
 - **Create**: Create a new contact
@@ -66,7 +67,7 @@ npm install n8n-nodes-sendseven
 Chain two nodes:
 
 1. **Attachment → Upload** (or **Upload from URL**) — produces an attachment object whose `id` is the attachment UUID.
-2. **Message → Send** — set the **Attachment IDs** field to an expression referencing the previous node's `id` (e.g. `{{ $json.id }}`), or a comma-separated list of several UUIDs. The node passes these into the `attachments` array of `POST /messages`, and the channel adapter renders them by content type (e.g. WhatsApp image/document, email attachment).
+2. **Message → Send** — set the **Attachment IDs** field to an expression referencing the previous node's `id` (e.g. `{{ $json.id }}`), or a comma-separated list of several UUIDs. The node passes these into the `attachments` array of `POST /messages`, and the channel adapter renders them by content type (e.g. WhatsApp image/document, email attachment). Listing several UUIDs sends them as separate messages, in order, with the caption/text on the first — except on Email, where they're combined into one email with multiple attachments.
 
 ### SendSeven Trigger Node (Webhooks)
 
@@ -171,6 +172,13 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### Unreleased — Multi-attachment fan-out (copy update, not yet republished)
+
+- **Message → Send**: docs/descriptions no longer imply attachments beyond the first are dropped. `POST /messages` now fans out N attachments into N separate messages (in order, text on the first) instead of silently discarding parts 2..N — the **Attachment IDs** field's documented "comma-separated UUIDs" behavior is now actually true for more than one ID.
+- **Additive response field**: `formatMessageResponse` now also returns `relatedMessageIds` (array of message IDs, parts 2..N, empty by default). No existing field changed or removed.
+- **Billing note**: sending N attachments now creates N billable messages instead of 1 (except on an Email channel, which still sends one email with all attachments as MIME parts).
+- No request-shape or client-side parsing changes — the comma-split logic already produced a flat UUID array, which is unaffected. Not yet published to npm.
 
 ### 1.2.4
 

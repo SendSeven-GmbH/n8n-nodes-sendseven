@@ -440,7 +440,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				description:
-					'Comma-separated attachment UUIDs (from the Attachment resource). Each must be a valid attachment ID, not a raw URL.',
+					'Comma-separated attachment UUIDs (from the Attachment resource). Each must be a valid attachment ID, not a raw URL. Listing more than one delivers them as separate messages, in order — only the first message carries the Message Text above. Exception: on an Email channel, all attachments go out together as one email. Each attachment message is billed separately (the email exception is billed as one message). See the response\'s relatedMessageIds for the IDs of parts 2..N.',
 				placeholder: '550e8400-e29b-41d4-a716-446655440000, ...',
 			},
 
