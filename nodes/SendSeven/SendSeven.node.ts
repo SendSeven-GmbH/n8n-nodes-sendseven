@@ -631,6 +631,7 @@ export class SendSeven implements INodeType {
 					{ name: 'Messenger ID', value: 'messenger_id' },
 					{ name: 'Phone', value: 'phone' },
 					{ name: 'Telegram ID', value: 'telegram_id' },
+					{ name: 'WhatsApp BSUID', value: 'whatsapp_bsuid' },
 					{ name: 'WhatsApp ID', value: 'whatsapp_id' },
 				],
 				default: 'phone',
@@ -662,12 +663,12 @@ export class SendSeven implements INodeType {
 					show: {
 						resource: ['contact'],
 						operation: ['addMethod'],
-						methodType: ['messenger_id', 'instagram_id'],
+						methodType: ['messenger_id', 'instagram_id', 'whatsapp_bsuid'],
 					},
 				},
 				default: '',
 				required: true,
-				description: 'Channel this page-scoped method belongs to (required for Messenger/Instagram IDs). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+				description: 'Channel this page-scoped method belongs to (required for Messenger IDs, Instagram IDs, and WhatsApp BSUIDs — a BSUID is only valid for the WhatsApp channel that issued it). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			// ---- Delete Method ----
 			{
@@ -1377,7 +1378,7 @@ export class SendSeven implements INodeType {
 
 						const body: IDataObject = { method_type: methodType, value };
 
-						if (methodType === 'messenger_id' || methodType === 'instagram_id') {
+						if (methodType === 'messenger_id' || methodType === 'instagram_id' || methodType === 'whatsapp_bsuid') {
 							const channelId = this.getNodeParameter('methodChannelId', i, '') as string;
 							validateRequiredFields(this, { channelId }, ['channelId']);
 							body.channel_id = channelId;
