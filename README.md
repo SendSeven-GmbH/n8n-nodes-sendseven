@@ -48,6 +48,14 @@ npm install n8n-nodes-sendseven
 - **Close**: Close a conversation
 - **Assign**: Assign a conversation to a team member
 
+#### List
+- **Add Member**: Add (subscribe) a contact to a static or newsletter list — `POST /lists/{list_id}/members`. **Channel Type** is a required field (defaults to **Email**) so every workflow explicitly states which channel the subscription is for; it's ignored server-side for static lists. **Channel Type** = Telegram, Messenger, or Instagram additionally requires **Channel ID** (which bot/page). The same contact can subscribe to the same newsletter via multiple channels by running this operation once per channel.
+- **Remove Member**: Remove (unsubscribe) a contact from a list — `DELETE /lists/{list_id}/members/{contact_id}`. Same **Channel Type** / **Channel ID** rules as Add Member; removes only the subscription for the specified channel.
+
+Both operations work against static lists too (Channel Type is sent but ignored there). Dynamic lists cannot have members added/removed directly — their membership comes from segment conditions.
+
+> **Note on the backend's `channel_type` default:** the SendSeven API has a deprecated fallback where a newsletter list add/remove with no `channel_type` defaults to `email` (kept indefinitely for old raw-HTTP callers, e.g. workflows built before this node had a List resource). This node never relies on that fallback — it always sends `channel_type` explicitly.
+
 #### WhatsApp Template
 - **Send**: Send a pre-approved WhatsApp template message. Provide **at least one recipient** (Contact ID is no longer mandatory):
   - **Contact ID** — a contact; uses its first WhatsApp method, phone as fallback.
@@ -131,6 +139,7 @@ Different operations require different scopes:
 | Manage Tags | `tags:read` |
 | Read Conversations | `conversations:read` |
 | Manage Conversations | `conversations:update` |
+| Add/Remove List Member | `lists:update` |
 | Webhooks | `webhooks:create`, `webhooks:read`, `webhooks:delete` |
 | Knowledge Base | `knowledge_base:read` |
 | Team Members | `team:read` |
@@ -172,6 +181,13 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### 1.4.0
+
+- Added **List** resource with **Add Member** / **Remove Member** operations (`POST`/`DELETE /lists/{list_id}/members[/{contact_id}]`), fixing the case where n8n users had no first-class way to subscribe/unsubscribe a contact from a newsletter list and were forced onto the generic HTTP Request node (which previously 501'd on newsletter lists before a backend fix).
+- **Channel Type** is a **required** field on both operations (options: Email/SMS/WhatsApp/Telegram/Messenger/Instagram; defaults to **Email**) — this node always sends it explicitly rather than relying on the backend's deprecated missing-`channel_type`-defaults-to-email fallback. **Channel ID** is additionally required (and only shown) when Channel Type is Telegram, Messenger, or Instagram (page/bot-scoped).
+- Added `getLists` loadOptions dropdown (`GET /lists`).
+- Purely additive — no existing resource, operation, or field changed. Existing workflows are unaffected.
 
 ### Unreleased — Multi-attachment fan-out (copy update, not yet republished)
 

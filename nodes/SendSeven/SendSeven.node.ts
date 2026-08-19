@@ -20,6 +20,8 @@ import {
 	formatMessageResponse,
 	CHANNEL_TYPES,
 	CONVERSATION_STATUSES,
+	SUBSCRIPTION_CHANNEL_TYPES,
+	SCOPED_SUBSCRIPTION_CHANNEL_TYPES,
 } from './GenericFunctions';
 
 /**
@@ -43,6 +45,8 @@ import {
  * - Assign Conversation (POST with user_id in URL)
  * - Send WhatsApp Template
  * - Upload Attachment (binary input -> multipart) / Upload Attachment from URL
+ * - Add Member to List / Remove Member from List (subscribe/unsubscribe a contact
+ *   to a static or newsletter list; channel_type required, defaults to email)
  */
 export class SendSeven implements INodeType {
 	description: INodeTypeDescription = {
@@ -114,6 +118,10 @@ export class SendSeven implements INodeType {
 					{
 						name: 'Conversation',
 						value: 'conversation',
+					},
+					{
+						name: 'List',
+						value: 'list',
 					},
 					{
 						name: 'Message',
@@ -260,6 +268,33 @@ export class SendSeven implements INodeType {
 					},
 				],
 				default: 'get',
+			},
+			// List operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['list'],
+					},
+				},
+				options: [
+					{
+						name: 'Add Member',
+						value: 'addMember',
+						description: 'Add (subscribe) a contact to a list',
+						action: 'Add member to list',
+					},
+					{
+						name: 'Remove Member',
+						value: 'removeMember',
+						description: 'Remove (unsubscribe) a contact from a list',
+						action: 'Remove member from list',
+					},
+				],
+				default: 'addMember',
 			},
 			// WhatsApp Template operations
 			{
@@ -796,6 +831,72 @@ export class SendSeven implements INodeType {
 				],
 			},
 
+			// ==================== LIST FIELDS ====================
+			{
+				displayName: 'List Name or ID',
+				name: 'listId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getLists',
+				},
+				displayOptions: {
+					show: {
+						resource: ['list'],
+						operation: ['addMember', 'removeMember'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'Select the list to add the contact to or remove them from. Works for static and newsletter lists. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+			{
+				displayName: 'Contact ID',
+				name: 'listContactId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['list'],
+						operation: ['addMember', 'removeMember'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'The unique ID of the contact to add to or remove from the list',
+			},
+			{
+				displayName: 'Channel Type',
+				name: 'listChannelType',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['list'],
+						operation: ['addMember', 'removeMember'],
+					},
+				},
+				options: SUBSCRIPTION_CHANNEL_TYPES,
+				default: 'email',
+				required: true,
+				description: 'Which channel this list subscription applies to. Ignored for static lists (membership is not channel-specific there); required by this node for newsletter lists so every workflow sends the explicit contract. Defaults to Email, the classic newsletter behavior. Telegram, Messenger, and Instagram additionally require Channel ID below.',
+			},
+			{
+				displayName: 'Channel Name or ID',
+				name: 'listChannelId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getChannels',
+				},
+				displayOptions: {
+					show: {
+						resource: ['list'],
+						operation: ['addMember', 'removeMember'],
+						listChannelType: SCOPED_SUBSCRIPTION_CHANNEL_TYPES,
+					},
+				},
+				default: '',
+				required: true,
+				description: 'Which bot/page this subscription belongs to — required for Telegram, Messenger, and Instagram (page/bot-scoped channels). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+
 			// ==================== WHATSAPP TEMPLATE FIELDS ====================
 			{
 				displayName: 'WhatsApp Channel Name or ID',
@@ -1112,6 +1213,17 @@ export class SendSeven implements INodeType {
 				return fields.map((field) => ({
 					name: `${field.name as string} (${field.key as string})`,
 					value: field.id as string,
+				}));
+			},
+
+			/**
+			 * Get lists (static/dynamic/newsletter) for dropdown
+			 */
+			async getLists(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const lists = await sendSevenApiRequestAllItems.call(this, '/lists');
+				return lists.map((list) => ({
+					name: `${list.name as string} (${list.list_type as string})`,
+					value: list.id as string,
 				}));
 			},
 
@@ -1477,6 +1589,69 @@ export class SendSeven implements INodeType {
 							`/conversations/${conversationId}/assign/${userId}`,
 						);
 						responseData = formatConversationResponse(responseData as IDataObject);
+					}
+				}
+
+				// ==================== LIST ====================
+				else if (resource === 'list') {
+					if (operation === 'addMember') {
+						const listId = this.getNodeParameter('listId', i) as string;
+						const contactId = this.getNodeParameter('listContactId', i) as string;
+						const channelType = this.getNodeParameter('listChannelType', i, 'email') as string;
+						const channelId = this.getNodeParameter('listChannelId', i, '') as string;
+
+						validateRequiredFields(this, { listId, contactId, channelType }, ['listId', 'contactId', 'channelType']);
+
+						// channel_id is required for page/bot-scoped channel types (telegram,
+						// messenger, instagram) — mirrors SubscriptionService.SCOPED_CHANNEL_TYPES.
+						if (SCOPED_SUBSCRIPTION_CHANNEL_TYPES.includes(channelType)) {
+							validateRequiredFields(this, { channelId }, ['channelId']);
+						}
+
+						// channel_type is always sent explicitly (this node never relies on the
+						// backend's deprecated missing-channel_type email fallback), matching the
+						// current contract for POST /lists/{list_id}/members. Ignored server-side
+						// for static lists; required for newsletter lists.
+						const body: IDataObject = { contact_id: contactId, channel_type: channelType };
+						if (channelId) body.channel_id = channelId;
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'POST',
+							`/lists/${listId}/members`,
+							body,
+						);
+						const addResp = responseData as IDataObject;
+						responseData = {
+							success: addResp.success,
+							message: addResp.message,
+							memberId: addResp.member_id,
+						};
+					}
+
+					else if (operation === 'removeMember') {
+						const listId = this.getNodeParameter('listId', i) as string;
+						const contactId = this.getNodeParameter('listContactId', i) as string;
+						const channelType = this.getNodeParameter('listChannelType', i, 'email') as string;
+
+						validateRequiredFields(this, { listId, contactId, channelType }, ['listId', 'contactId', 'channelType']);
+
+						// DELETE /lists/{list_id}/members/{contact_id} returns 204 No Content, so
+						// build the response ourselves (same convention as Contact > Remove Tag).
+						await sendSevenApiRequest.call(
+							this,
+							'DELETE',
+							`/lists/${listId}/members/${contactId}`,
+							{},
+							{ channel_type: channelType },
+						);
+						responseData = {
+							success: true,
+							listId,
+							contactId,
+							channelType,
+							message: 'Contact removed from list',
+						};
 					}
 				}
 

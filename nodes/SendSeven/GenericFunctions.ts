@@ -253,6 +253,40 @@ export const CONVERSATION_STATUSES = [
 ];
 
 /**
+ * Channel types a contact can hold a LIST SUBSCRIPTION on (POST/DELETE
+ * /lists/{list_id}/members). This is the `SubscriptionChannelType` enum on
+ * the backend — a narrower set than CHANNEL_TYPES above (no `live_chat`,
+ * adds no browser_push here either; matches the six types exposed in this
+ * node's List resource UI).
+ *
+ * The backend added a TEMPORARY-looking back-compat default on 2026-08-19
+ * (missing channel_type on a newsletter list add/remove -> defaults to
+ * email) which has since been made an INDEFINITE deprecated fallback (no
+ * removal date) — old raw-HTTP callers keep working forever. This node does
+ * NOT rely on that fallback: `channel_type` is a REQUIRED field here
+ * (default `email`), so every workflow built with this node always sends
+ * the explicit value and demonstrates the current contract, independent of
+ * whenever the backend eventually retires the fallback on its own schedule.
+ */
+export const SUBSCRIPTION_CHANNEL_TYPES = [
+	{ name: 'Email', value: 'email' },
+	{ name: 'SMS', value: 'sms' },
+	{ name: 'WhatsApp', value: 'whatsapp' },
+	{ name: 'Telegram', value: 'telegram' },
+	{ name: 'Messenger', value: 'messenger' },
+	{ name: 'Instagram', value: 'instagram' },
+];
+
+/**
+ * Subscription channel types that are page/bot-scoped and therefore require
+ * a `channel_id` (which bot/page) on list add/remove — mirrors the backend's
+ * `SCOPED_CHANNEL_TYPES` in `subscription_service.py`. WhatsApp and SMS are
+ * NOT scoped for subscriptions (unlike WhatsApp's page-scoped BSUID contact
+ * method elsewhere in this node).
+ */
+export const SCOPED_SUBSCRIPTION_CHANNEL_TYPES = ['telegram', 'messenger', 'instagram'];
+
+/**
  * Webhook event types available in SendSeven
  */
 export const WEBHOOK_EVENTS = [
