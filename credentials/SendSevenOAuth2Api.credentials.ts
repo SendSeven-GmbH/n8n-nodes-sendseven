@@ -46,7 +46,7 @@ export class SendSevenOAuth2Api implements ICredentialType {
 			displayName: 'Scope',
 			name: 'scope',
 			type: 'hidden',
-			default: 'messages:read messages:create conversations:read conversations:update contacts:read contacts:create contacts:update tags:read webhooks:create webhooks:read webhooks:delete channels:read knowledge_base:read team:read',
+			default: 'messages:read messages:create conversations:read conversations:update contacts:read contacts:create contacts:update tags:read webhooks:create webhooks:read webhooks:delete channels:read knowledge_base:read team:read lists:update',
 		},
 		{
 			displayName: 'Auth URI Query Parameters',

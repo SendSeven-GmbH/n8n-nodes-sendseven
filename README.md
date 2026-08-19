@@ -182,6 +182,11 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### 1.4.1
+
+- **Fix (List → Remove Member)**: Channel ID (`listChannelId`) is now read and sent as `channel_id` on `DELETE /lists/{list_id}/members/{contact_id}` when Channel Type is Telegram, Messenger, or Instagram — it was previously collected in the UI but silently dropped, so the backend could not identify the correct channel-scoped subscription to remove. Mirrors the existing Add Member behavior.
+- **Fix (OAuth2 credentials)**: Added the missing `lists:update` scope to the OAuth2 default scope string — required for both List → Add Member and List → Remove Member, as already documented in the Required Scopes table below.
+
 ### 1.4.0
 
 - Added **List** resource with **Add Member** / **Remove Member** operations (`POST`/`DELETE /lists/{list_id}/members[/{contact_id}]`), fixing the case where n8n users had no first-class way to subscribe/unsubscribe a contact from a newsletter list and were forced onto the generic HTTP Request node (which previously 501'd on newsletter lists before a backend fix).

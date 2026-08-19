@@ -1633,17 +1633,27 @@ export class SendSeven implements INodeType {
 						const listId = this.getNodeParameter('listId', i) as string;
 						const contactId = this.getNodeParameter('listContactId', i) as string;
 						const channelType = this.getNodeParameter('listChannelType', i, 'email') as string;
+						const channelId = this.getNodeParameter('listChannelId', i, '') as string;
 
 						validateRequiredFields(this, { listId, contactId, channelType }, ['listId', 'contactId', 'channelType']);
 
+						// channel_id is required for page/bot-scoped channel types (telegram,
+						// messenger, instagram) — mirrors addMember / SubscriptionService.SCOPED_CHANNEL_TYPES.
+						if (SCOPED_SUBSCRIPTION_CHANNEL_TYPES.includes(channelType)) {
+							validateRequiredFields(this, { channelId }, ['channelId']);
+						}
+
 						// DELETE /lists/{list_id}/members/{contact_id} returns 204 No Content, so
 						// build the response ourselves (same convention as Contact > Remove Tag).
+						const query: IDataObject = { channel_type: channelType };
+						if (channelId) query.channel_id = channelId;
+
 						await sendSevenApiRequest.call(
 							this,
 							'DELETE',
 							`/lists/${listId}/members/${contactId}`,
 							{},
-							{ channel_type: channelType },
+							query,
 						);
 						responseData = {
 							success: true,
