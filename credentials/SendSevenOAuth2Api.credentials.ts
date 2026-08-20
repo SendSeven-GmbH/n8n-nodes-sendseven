@@ -15,6 +15,7 @@ import type { ICredentialType, INodeProperties, Icon } from 'n8n-workflow';
  * - channels:read
  * - knowledge_base:read
  * - team:read
+ * - lists:update
  */
 export class SendSevenOAuth2Api implements ICredentialType {
 	name = 'sendSevenOAuth2Api';
