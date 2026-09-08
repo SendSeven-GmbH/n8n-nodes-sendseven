@@ -47,6 +47,11 @@ import {
  * - Upload Attachment (binary input -> multipart) / Upload Attachment from URL
  * - Add Member to List / Remove Member from List (subscribe/unsubscribe a contact
  *   to a static or newsletter list; channel_type required, defaults to email)
+ * - Send Team Chat Channel Message (bot post to a channel by UUID or "#name";
+ *   requires the channel's "Allow Bots" setting; supports both attachment_ids
+ *   and attachment URL forms)
+ * - Send Team Chat Direct Message (bot DM to a user by ID; always allowed once
+ *   authenticated; same attachment forms as the channel message action)
  */
 export class SendSeven implements INodeType {
 	description: INodeTypeDescription = {
@@ -128,11 +133,42 @@ export class SendSeven implements INodeType {
 						value: 'message',
 					},
 					{
+						name: 'Team Chat',
+						value: 'teamChat',
+					},
+					{
 						name: 'WhatsApp Template',
 						value: 'whatsappTemplate',
 					},
 				],
 				default: 'message',
+			},
+			// Team Chat operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['teamChat'],
+					},
+				},
+				options: [
+					{
+						name: 'Send Channel Message',
+						value: 'sendChannelMessage',
+						description: 'Post a message to a Team Chat channel as a bot',
+						action: 'Send a team chat channel message',
+					},
+					{
+						name: 'Send Direct Message',
+						value: 'sendDirectMessage',
+						description: 'Send a Team Chat direct message to a user as a bot',
+						action: 'Send a team chat direct message',
+					},
+				],
+				default: 'sendChannelMessage',
 			},
 			// Message operations
 			{
@@ -895,6 +931,100 @@ export class SendSeven implements INodeType {
 				default: '',
 				required: true,
 				description: 'Which bot/page this subscription belongs to — required for Telegram, Messenger, and Instagram (page/bot-scoped channels). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+
+			// ==================== TEAM CHAT FIELDS ====================
+			{
+				displayName: 'Channel',
+				name: 'teamChatChannelRef',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['teamChat'],
+						operation: ['sendChannelMessage'],
+					},
+				},
+				default: '',
+				required: true,
+				description:
+					'The channel to post to. Accepts either the channel UUID or a name such as "#general" or "general". The channel must have "Allow Bots to send messages" enabled in its Team Chat channel settings; system channels (e.g. #knowledgebase) never accept bot messages.',
+			},
+			{
+				displayName: 'User ID',
+				name: 'teamChatUserId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['teamChat'],
+						operation: ['sendDirectMessage'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'The user ID of the team member to send the direct message to. Always allowed once authenticated — no channel settings apply to DMs. This field is a plain text ID (not a dropdown) so the Team Chat bot actions only require the minimal teamchat:write scope, not team:read.',
+			},
+			{
+				displayName: 'Text',
+				name: 'teamChatText',
+				type: 'string',
+				typeOptions: {
+					rows: 4,
+				},
+				displayOptions: {
+					show: {
+						resource: ['teamChat'],
+						operation: ['sendChannelMessage', 'sendDirectMessage'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'The message text to send (1-40,000 characters)',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'teamChatAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add Field',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: ['teamChat'],
+						operation: ['sendChannelMessage', 'sendDirectMessage'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Bot Name',
+						name: 'botName',
+						type: 'string',
+						default: '',
+						description:
+							'Display name for the bot posting this message (max 50 characters), e.g. "n8n Bot". Messages from bots always show a bot avatar regardless of this field.',
+					},
+					{
+						displayName: 'Attachment IDs',
+						name: 'attachmentIds',
+						type: 'string',
+						default: '',
+						description:
+							'Comma-separated attachment UUIDs from the Attachment resource (Upload / Upload From URL). Alternative to Attachment URL below — use whichever form you have.',
+					},
+					{
+						displayName: 'Attachment URL',
+						name: 'attachmentUrl',
+						type: 'string',
+						default: '',
+						description:
+							'A public image, video, or audio URL — SendSeven downloads it and attaches it to the message. Alternative to Attachment IDs above.',
+					},
+					{
+						displayName: 'Attachment Filename',
+						name: 'attachmentFilename',
+						type: 'string',
+						default: '',
+						description: 'Optional filename to use for the Attachment URL above',
+					},
+				],
 			},
 
 			// ==================== WHATSAPP TEMPLATE FIELDS ====================
@@ -1814,6 +1944,58 @@ export class SendSeven implements INodeType {
 							this,
 							'POST',
 							'/attachments/from-url',
+							body,
+						);
+					}
+				}
+
+				// ==================== TEAM CHAT ====================
+				else if (resource === 'teamChat') {
+					const text = this.getNodeParameter('teamChatText', i) as string;
+					const additionalFields = this.getNodeParameter('teamChatAdditionalFields', i, {}) as IDataObject;
+
+					const body: IDataObject = { text };
+
+					if (additionalFields.botName) {
+						body.bot_name = additionalFields.botName as string;
+					}
+
+					if (additionalFields.attachmentIds) {
+						const attachmentIds = (additionalFields.attachmentIds as string)
+							.split(',')
+							.map((id) => id.trim())
+							.filter((id) => id.length > 0);
+						if (attachmentIds.length > 0) {
+							body.attachment_ids = attachmentIds;
+						}
+					}
+
+					if (additionalFields.attachmentUrl) {
+						const attachment: IDataObject = { url: additionalFields.attachmentUrl as string };
+						if (additionalFields.attachmentFilename) {
+							attachment.filename = additionalFields.attachmentFilename as string;
+						}
+						body.attachments = [attachment];
+					}
+
+					if (operation === 'sendChannelMessage') {
+						const channelRef = this.getNodeParameter('teamChatChannelRef', i) as string;
+						validateRequiredFields(this, { channelRef, text }, ['channelRef', 'text']);
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'POST',
+							`/team-chat/bot/channels/${encodeURIComponent(channelRef)}/messages`,
+							body,
+						);
+					} else if (operation === 'sendDirectMessage') {
+						const userId = this.getNodeParameter('teamChatUserId', i) as string;
+						validateRequiredFields(this, { userId, text }, ['userId', 'text']);
+
+						responseData = await sendSevenApiRequest.call(
+							this,
+							'POST',
+							`/team-chat/bot/users/${encodeURIComponent(userId)}/messages`,
 							body,
 						);
 					}

@@ -308,7 +308,10 @@ export const WEBHOOK_EVENTS = [
 	{ name: 'Contact Created', value: 'contact.created' },
 	{ name: 'Contact Updated', value: 'contact.updated' },
 	{ name: 'Contact Deleted', value: 'contact.deleted' },
+	{ name: 'Contact Subscribed', value: 'contact.subscribed' },
+	{ name: 'Contact Unsubscribed', value: 'contact.unsubscribed' },
 	{ name: 'Link Clicked', value: 'link.clicked' },
+	{ name: 'Team Chat Message Created (Channels Only - No DM Event)', value: 'team_chat.message.created' },
 ];
 
 /**

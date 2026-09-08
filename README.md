@@ -77,7 +77,13 @@ Chain two nodes:
 1. **Attachment → Upload** (or **Upload from URL**) — produces an attachment object whose `id` is the attachment UUID.
 2. **Message → Send** — set the **Attachment IDs** field to an expression referencing the previous node's `id` (e.g. `{{ $json.id }}`), or a comma-separated list of several UUIDs. The node passes these into the `attachments` array of `POST /messages`, and the channel adapter renders them by content type (e.g. WhatsApp image/document, email attachment). Listing several UUIDs sends them as separate messages, in order, with the caption/text on the first — except on Email, where they're combined into one email with multiple attachments.
 
-### SendSeven Trigger Node (Webhooks)
+#### Team Chat
+- **Send Channel Message**: Post a message to a Team Chat channel as a bot — `POST /team-chat/bot/channels/{channel_ref}/messages`. **Channel** accepts either the channel UUID or a name such as `#general` or `general`. The channel must have "Allow Bots to send messages" enabled in its Team Chat settings; system channels (e.g. `#knowledgebase`) never accept bot messages. Bot messages always render with a bot avatar; **Bot Name** (Additional Fields) sets the display name shown, up to 50 characters.
+- **Send Direct Message**: Send a Team Chat direct message to a user as a bot — `POST /team-chat/bot/users/{user_id}/messages`. Always allowed once authenticated — there is no "Allow Bots" setting for DMs.
+- Both operations support **attachments** in either form (Additional Fields): a comma-separated **Attachment IDs** list (previously uploaded via the Attachment resource), or an **Attachment URL** (+ optional **Attachment Filename**) for a public image/video/audio URL that SendSeven downloads server-side. Use whichever form fits your workflow.
+- Requires the `teamchat:write` OAuth2 scope (bot-only — distinct from the human `team_chat:*` scopes). Existing OAuth2 credentials must be reconnected once to pick up this scope.
+
+### SendSeven WhatsApp & more Node (Webhooks)
 
 Listen for real-time events:
 
@@ -100,6 +106,7 @@ Listen for real-time events:
 - **Contact Deleted**: Triggers when a contact is deleted
 - **Link Clicked**: Triggers when a tracked link is clicked
 - **Campaign Sent**: Triggers when a campaign completes sending
+- **Team Chat Message Created**: Triggers when a bot- or human-authored message is posted to a Team Chat **channel** with "Allow Bots" enabled. Use the **Channel Filter** field (accepts a channel UUID or a name such as `#general`/`general`) to restrict the trigger to one channel; leave it blank to receive messages from every eligible channel. **Important:** Team Chat direct messages never trigger this node — SendSeven only publishes a webhook for channel messages, so there is no way to subscribe to DM events.
 
 ## Authentication
 
@@ -143,6 +150,7 @@ Different operations require different scopes:
 | Webhooks | `webhooks:create`, `webhooks:read`, `webhooks:delete` |
 | Knowledge Base | `knowledge_base:read` |
 | Team Members | `team:read` |
+| Send Team Chat Channel/Direct Message | `teamchat:write` (bot-only; no underscore — distinct from the human `team_chat:*` scopes) |
 
 ## Example Workflows
 
@@ -154,13 +162,13 @@ Different operations require different scopes:
 
 ### Log support conversations to spreadsheet
 
-1. Add SendSeven Trigger with "Conversation Closed" event
+1. Add SendSeven WhatsApp & more with "Conversation Closed" event
 2. Add Google Sheets node to append row
 3. Map conversation data to spreadsheet columns
 
 ### Auto-respond to incoming messages
 
-1. Add SendSeven Trigger with "Message Received" event
+1. Add SendSeven WhatsApp & more with "Message Received" event
 2. Add IF node to check message content
 3. Add SendSeven node with "Message > Send" to reply
 
@@ -181,6 +189,18 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### 1.5.0 — Team Chat Bots: send actions + trigger
+
+- **Added Team Chat resource** to the SendSeven node with two new operations: **Send Channel Message** (`POST /team-chat/bot/channels/{channel_ref}/messages`, channel by UUID or `#name`) and **Send Direct Message** (`POST /team-chat/bot/users/{user_id}/messages`). Both support attachments via a comma-separated **Attachment IDs** field or a public **Attachment URL** + optional **Attachment Filename**.
+- **Added `team_chat.message.created`** to the Trigger node's Events dropdown, with a new **Channel Filter** field (channel UUID or `#name`) matched client-side against both the channel ID and name. Direct messages never trigger this node — SendSeven only emits a webhook for channel messages.
+- **Added the `teamchat:write` OAuth2 scope** (bot-only; deliberately no underscore, distinct from the human `team_chat:*` scopes) to the SendSeven OAuth2 credential. Existing OAuth2-authenticated workflows must reconnect the credential once to pick up the new scope before these actions/trigger will work.
+
+### Unreleased — Contact Subscribed / Unsubscribed trigger events
+
+- **Added `contact.subscribed` and `contact.unsubscribed`** to the Trigger node's Events dropdown — previously these backend events existed and already fired in production, but were not selectable here at all, so no n8n workflow could react to a newsletter opt-in/opt-out.
+- Added a matching `switch` case in `webhook()` that formats the payload's `data.subscription` object (`list_id`, `list_name`, `channel_type`, `channel_id`, `status`, `opt_in_method`) into a `subscription` field alongside the standard `contact` field, instead of falling through to the generic `default:` passthrough.
+- No new backend event or request-shape change — purely additive to the trigger node. Not yet republished to npm.
 
 ### 1.4.1
 

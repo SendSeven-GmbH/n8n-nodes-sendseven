@@ -18,7 +18,7 @@ import {
 } from './GenericFunctions';
 
 /**
- * SendSeven Trigger Node
+ * SendSeven WhatsApp & more Node
  *
  * Webhook-based trigger node for SendSeven events.
  * Automatically subscribes/unsubscribes to webhook events.
@@ -34,7 +34,7 @@ import {
  */
 export class SendSevenTrigger implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'SendSeven Trigger',
+		displayName: 'SendSeven WhatsApp & more',
 		name: 'sendSevenTrigger',
 		icon: 'file:sendseven.svg',
 		group: ['trigger'],
@@ -42,7 +42,7 @@ export class SendSevenTrigger implements INodeType {
 		subtitle: '={{$parameter["event"]}}',
 		description: 'Send and receive WhatsApp Business API, Instagram, Telegram, Email etc. messages in a unified API',
 		defaults: {
-			name: 'SendSeven Trigger',
+			name: 'SendSeven WhatsApp & more',
 		},
 		inputs: [],
 		outputs: [NodeConnectionTypes.Main],
@@ -102,6 +102,20 @@ export class SendSevenTrigger implements INodeType {
 				default: 'message.received',
 				required: true,
 				description: 'The event to listen for',
+			},
+			// Team Chat channel filter (client-side only - see description below)
+			{
+				displayName: 'Channel Filter',
+				name: 'channelFilter',
+				type: 'string',
+				displayOptions: {
+					show: {
+						event: ['team_chat.message.created'],
+					},
+				},
+				default: '',
+				description:
+					'Optional. Only trigger for this Team Chat channel - accepts a channel UUID or a name such as "#general" or "general". Leave empty to trigger for messages in ANY channel that has "Allow Bots" enabled. SendSeven has no server-side per-subscription channel filter, so this is applied here in the node - non-matching events are silently dropped. IMPORTANT: Team Chat direct messages never trigger this node - SendSeven only publishes a webhook for channel messages (from channels with "Allow Bots" enabled); there is no DM webhook event to subscribe to.',
 			},
 		],
 	};
@@ -336,6 +350,28 @@ export class SendSevenTrigger implements INodeType {
 				break;
 			}
 
+			case 'contact.subscribed':
+			case 'contact.unsubscribed': {
+				const contact = data.contact as IDataObject || {};
+				const subscription = data.subscription as IDataObject || {};
+
+				formattedData = {
+					id: contact.id || body.event_id,
+					event: receivedEvent,
+					contact: contact.id ? formatContactResponse(contact) : null,
+					subscription: {
+						listId: subscription.list_id,
+						listName: subscription.list_name,
+						channelType: subscription.channel_type,
+						channelId: subscription.channel_id,
+						status: subscription.status,
+						optInMethod: subscription.opt_in_method,
+					},
+					timestamp: (body.created_at || body.timestamp),
+				};
+				break;
+			}
+
 			case 'email.received':
 			case 'email.sent':
 			case 'email.delivered':
@@ -407,6 +443,57 @@ export class SendSevenTrigger implements INodeType {
 						deliveredCount: campaign.delivered_count,
 						failedCount: campaign.failed_count,
 						sentAt: campaign.sent_at,
+					},
+					timestamp: (body.created_at || body.timestamp),
+				};
+				break;
+			}
+
+			case 'team_chat.message.created': {
+				// CHANNEL messages only - SendSeven never publishes this event for
+				// Team Chat direct messages (no DM webhook exists at all).
+				const channel = data.channel as IDataObject || {};
+				const message = data.message as IDataObject || {};
+
+				// Client-side channel filter: the backend has no per-subscription
+				// channel filter, so a configured "Channel Filter" is matched here
+				// against the incoming channel's id or name (accepting "#name" or
+				// a bare name, case-insensitively). Non-matching events are dropped.
+				const channelFilter = (this.getNodeParameter('channelFilter', '') as string).trim();
+				if (channelFilter) {
+					const normalizedFilter = channelFilter.replace(/^#/, '').toLowerCase();
+					const channelId = String(channel.id || '').toLowerCase();
+					const channelName = String(channel.name || '').replace(/^#/, '').toLowerCase();
+					if (normalizedFilter !== channelId && normalizedFilter !== channelName) {
+						return { noWebhookResponse: true };
+					}
+				}
+
+				formattedData = {
+					id: message.id || body.event_id,
+					event: receivedEvent,
+					channel: {
+						id: channel.id,
+						name: channel.name,
+						displayName: channel.display_name,
+						allowBots: channel.allow_bots,
+						isSystem: channel.is_system,
+					},
+					message: {
+						id: message.id,
+						channelId: message.channel_id,
+						text: message.text,
+						senderType: message.sender_type,
+						isBot: message.sender_type === 'bot',
+						senderUserId: message.sender_user_id,
+						senderUsername: message.sender_username,
+						botName: message.bot_name,
+						mentionedUserIds: message.mentioned_user_ids || [],
+						mentionedAll: message.mentioned_all || false,
+						parentMessageId: message.parent_message_id,
+						attachmentIds: message.attachment_ids || [],
+						attachments: message.attachments || [],
+						createdAt: message.created_at,
 					},
 					timestamp: (body.created_at || body.timestamp),
 				};
