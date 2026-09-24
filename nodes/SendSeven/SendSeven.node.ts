@@ -7,6 +7,7 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 	JsonObject,
+	ResourceMapperFields,
 } from 'n8n-workflow';
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
@@ -22,6 +23,10 @@ import {
 	CONVERSATION_STATUSES,
 	SUBSCRIPTION_CHANNEL_TYPES,
 	SCOPED_SUBSCRIPTION_CHANNEL_TYPES,
+	fetchActiveCustomFieldDefinitions,
+	getCustomFieldMapperFields,
+	collectCustomFieldsFromMapperValue,
+	withCustomFieldErrorHandling,
 } from './GenericFunctions';
 
 /**
@@ -32,11 +37,15 @@ import {
  *
  * Actions:
  * - Send Message (3 addressing modes: recipient+channel, conversation_id, contact+channel; optional attachment UUIDs)
- * - Create Contact (with contact_methods support)
- * - Update Contact (name, email, phone, avatar_url only)
+ * - Create Contact (with contact_methods support; custom fields via the
+ *   "Custom Fields" resourceMapper, PUT/POST body key `custom_fields`)
+ * - Update Contact (name, email, phone, avatar_url, custom fields)
  * - Delete Contact (GDPR delete)
  * - Add Tag / Remove Tag to/from Contact
- * - Set Custom Field on Contact (two-step: GET /custom-fields -> POST /contacts/{id}/fields/{field_id})
+ * - Set Custom Field on Contact (single field; routed through
+ *   PUT /contacts/{id} with { custom_fields: { <field_id>: value } } for
+ *   server-side type validation — NOT the legacy two-step
+ *   POST /contacts/{id}/fields/{field_id}, which has no type validation)
  * - Add Method / Delete Method on Contact (platform IDs via /contacts/{id}/methods)
  * - Search Contacts
  * - Search Conversations
@@ -654,7 +663,56 @@ export class SendSeven implements INodeType {
 					},
 				],
 			},
-			// ---- Set Custom Field ----
+			// ---- Custom Fields (Create / Update — bulk, via resourceMapper) ----
+			{
+				displayName: 'Custom Fields',
+				name: 'customFields',
+				type: 'resourceMapper',
+				noDataExpression: true,
+				default: { mappingMode: 'defineBelow', value: null },
+				required: false,
+				typeOptions: {
+					resourceMapper: {
+						resourceMapperMethod: 'getCustomFieldColumns',
+						mode: 'add',
+						fieldWords: { singular: 'custom field', plural: 'custom fields' },
+						addAllFields: false,
+						supportAutoMap: false,
+					},
+				},
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['create'],
+					},
+				},
+				description: 'Map values to the tenant\'s active custom field definitions. Leave a field unmapped to leave it unset; an explicit null (e.g. via an expression) is sent through as-is.',
+			},
+			{
+				displayName: 'Custom Fields',
+				name: 'customFieldsUpdate',
+				type: 'resourceMapper',
+				noDataExpression: true,
+				default: { mappingMode: 'defineBelow', value: null },
+				required: false,
+				typeOptions: {
+					resourceMapper: {
+						resourceMapperMethod: 'getCustomFieldColumns',
+						mode: 'update',
+						fieldWords: { singular: 'custom field', plural: 'custom fields' },
+						addAllFields: false,
+						supportAutoMap: false,
+					},
+				},
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['update'],
+					},
+				},
+				description: 'Map values to the tenant\'s active custom field definitions. Blank/empty values are never sent (leaves the field unchanged) — SendSeven treats blank the same as null on update, and n8n commonly emits blank for unmapped fields. To deliberately CLEAR a field, use the separate "Set Custom Field" operation with its Clear Field option, or map an expression that evaluates to a real null.',
+			},
+			// ---- Set Custom Field (single field, legacy op — routed through the validated bulk endpoint) ----
 			{
 				displayName: 'Custom Field Name or ID',
 				name: 'customFieldId',
@@ -680,10 +738,24 @@ export class SendSeven implements INodeType {
 					show: {
 						resource: ['contact'],
 						operation: ['setCustomField'],
+						clearField: [false],
 					},
 				},
 				default: '',
-				description: 'The value to set for the custom field (type depends on the field definition)',
+				description: 'The value to set for the custom field (type depends on the field definition — SendSeven validates and coerces it server-side)',
+			},
+			{
+				displayName: 'Clear Field Instead',
+				name: 'clearField',
+				type: 'boolean',
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['setCustomField'],
+					},
+				},
+				default: false,
+				description: 'Whether to clear this field instead of setting the Value above',
 			},
 			// ---- Add Method ----
 			{
@@ -1336,13 +1408,17 @@ export class SendSeven implements INodeType {
 			},
 
 			/**
-			 * Get custom field definitions for dropdown
+			 * Get active custom field definitions for the "Set Custom Field"
+			 * operation's Field dropdown. Filters `active_only: true` (also
+			 * defensively re-filtered client-side in case an old backend doesn't
+			 * recognize the param and lists inactive fields too).
 			 */
 			async getCustomFields(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-				const fields = await sendSevenApiRequestAllItems.call(this, '/custom-fields');
+				const fields = await fetchActiveCustomFieldDefinitions(this);
 				return fields.map((field) => ({
-					name: `${field.name as string} (${field.key as string})`,
+					name: `${field.name as string} (${field.field_type as string})`,
 					value: field.id as string,
+					description: (field.description as string) || undefined,
 				}));
 			},
 
@@ -1400,6 +1476,20 @@ export class SendSeven implements INodeType {
 					name: `${name} (${languages.join(', ')})`,
 					value: name,
 				}));
+			},
+		},
+
+		resourceMapping: {
+			/**
+			 * Schema for the `customFields`/`customFieldsUpdate` resourceMapper
+			 * parameters on Create/Update Contact — one row per active custom
+			 * field definition, keyed by definition id. This is a distinct n8n
+			 * mechanism from `loadOptions`/`loadOptionsMethod` above (registered
+			 * via `typeOptions.resourceMapper.resourceMapperMethod`, not
+			 * `loadOptionsMethod`), hence the separate top-level key.
+			 */
+			async getCustomFieldColumns(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
+				return getCustomFieldMapperFields(this);
 			},
 		},
 	};
@@ -1482,10 +1572,18 @@ export class SendSeven implements INodeType {
 								? JSON.parse(additionalFields.contactMethods)
 								: additionalFields.contactMethods;
 						}
-						// NOTE: custom_fields are NOT settable on the contact body (backend silently
-						// drops them). Use the dedicated "Set Custom Field" operation instead.
 
-						responseData = await sendSevenApiRequest.call(this, 'POST', '/contacts', body);
+						const customFieldsMapper = this.getNodeParameter('customFields', i, {}) as IDataObject;
+						const customFields = collectCustomFieldsFromMapperValue(
+							customFieldsMapper.value as IDataObject | null,
+						);
+						if (Object.keys(customFields).length > 0) {
+							body.custom_fields = customFields;
+						}
+
+						responseData = await withCustomFieldErrorHandling(this, i, () =>
+							sendSevenApiRequest.call(this, 'POST', '/contacts', body),
+						);
 						responseData = formatContactResponse(responseData as IDataObject);
 					}
 
@@ -1505,7 +1603,17 @@ export class SendSeven implements INodeType {
 						const additionalFields = this.getNodeParameter('additionalFieldsUpdate', i, {}) as IDataObject;
 						if (additionalFields.avatarUrl) body.avatar_url = additionalFields.avatarUrl;
 
-						responseData = await sendSevenApiRequest.call(this, 'PUT', `/contacts/${contactId}`, body);
+						const customFieldsMapper = this.getNodeParameter('customFieldsUpdate', i, {}) as IDataObject;
+						const customFields = collectCustomFieldsFromMapperValue(
+							customFieldsMapper.value as IDataObject | null,
+						);
+						if (Object.keys(customFields).length > 0) {
+							body.custom_fields = customFields;
+						}
+
+						responseData = await withCustomFieldErrorHandling(this, i, () =>
+							sendSevenApiRequest.call(this, 'PUT', `/contacts/${contactId}`, body),
+						);
 						responseData = formatContactResponse(responseData as IDataObject);
 					}
 
@@ -1595,16 +1703,41 @@ export class SendSeven implements INodeType {
 					else if (operation === 'setCustomField') {
 						const contactId = this.getNodeParameter('contactId', i) as string;
 						const fieldId = this.getNodeParameter('customFieldId', i) as string;
-						const value = this.getNodeParameter('customFieldValue', i, '') as string;
+						const clearField = this.getNodeParameter('clearField', i, false) as boolean;
+						const value = clearField
+							? null
+							: (this.getNodeParameter('customFieldValue', i, '') as string);
 
 						validateRequiredFields(this, { contactId, fieldId }, ['contactId', 'fieldId']);
 
-						responseData = await sendSevenApiRequest.call(
-							this,
-							'POST',
-							`/contacts/${contactId}/fields/${fieldId}`,
-							{ value },
-						);
+						// Routed through PUT /contacts/{id} with a single-key custom_fields
+						// map (NOT the legacy POST /contacts/{id}/fields/{field_id}, which
+						// has no type validation) — matches the Zapier connector's "Set
+						// Contact Custom Field" action, for full server-side type
+						// validation/coercion and the friendly 422 handling below.
+						const contactResponse = (await withCustomFieldErrorHandling(this, i, () =>
+							sendSevenApiRequest.call(this, 'PUT', `/contacts/${contactId}`, {
+								custom_fields: { [fieldId]: value },
+							}),
+						)) as IDataObject;
+
+						// The response's custom_fields map is keyed by the field's `key`
+						// (not id) and shaped { <key>: { field_definition_id, name,
+						// field_type, value } } — look up the confirmed value by id.
+						const customFieldsMap = contactResponse.custom_fields as IDataObject | undefined;
+						const confirmed = customFieldsMap
+							? Object.values(customFieldsMap).find(
+									(entry) => (entry as IDataObject)?.field_definition_id === fieldId,
+								)
+							: undefined;
+
+						responseData = {
+							contactId,
+							fieldId,
+							success: true,
+							message: clearField ? 'Custom field cleared.' : 'Custom field updated.',
+							value: confirmed ? (confirmed as IDataObject).value : undefined,
+						};
 					}
 
 					else if (operation === 'addMethod') {

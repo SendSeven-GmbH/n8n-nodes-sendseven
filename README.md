@@ -31,14 +31,14 @@ npm install n8n-nodes-sendseven
   - **Multiple attachments are delivered as separate messages**, in the order listed, with the **Message Text** attached only to the first — except on an **Email** channel, where all attachments go out together as one email. Each attachment message is billed separately (the email exception is billed as one message). The output's new `relatedMessageIds` field lists the IDs of the additional messages (parts 2..N); it's empty for ordinary single-part sends.
 
 #### Contact
-- **Create**: Create a new contact
-- **Update**: Update an existing contact (name, email, phone, avatar URL)
+- **Create**: Create a new contact. A **Custom Fields** mapper lets you set any of the tenant's active custom fields (by definition, one row per field, typed per its `field_type`) at the same time — leave a row unmapped to skip it.
+- **Update**: Update an existing contact (name, email, phone, avatar URL). Has its own **Custom Fields** mapper (same as Create). Blank/unmapped rows are never sent — SendSeven treats blank the same as clearing the field on update, so an untouched row must never risk wiping it. To deliberately clear a field, use **Set Custom Field**'s Clear Field option instead, or map an expression that evaluates to a real `null`.
 - **Get**: Get a contact by ID
 - **Delete**: Delete a contact (GDPR delete — conversations anonymized, billing preserved)
 - **Search**: Search contacts by name, email, or phone
 - **Add Tag**: Add a tag to a contact
 - **Remove Tag**: Remove a tag from a contact
-- **Set Custom Field**: Set a custom field value on a contact. The **Custom Field** dropdown is populated from your tenant's field definitions (`GET /custom-fields`); the value is written via `POST /contacts/{id}/fields/{field_id}`.
+- **Set Custom Field**: Set (or, with **Clear Field Instead**, clear) a single custom field on a contact. The **Custom Field** dropdown is populated from your tenant's active field definitions (`GET /custom-fields?active_only=true`). The value is written via `PUT /contacts/{id}` with `{ custom_fields: { <field_id>: value } }` — the same validated bulk endpoint as Create/Update — so an invalid value (wrong type, not one of a select's options, an unknown/deleted field, etc.) fails with a clear, per-field error instead of silently accepting bad data. This replaced the legacy `POST /contacts/{id}/fields/{field_id}` write, which has no server-side type validation.
 - **Add Method**: Add a contact method (platform ID). Method types: `phone`, `email`, `whatsapp_id`, `telegram_id`, `messenger_id`, `instagram_id`. For `messenger_id`/`instagram_id` a **Channel** must be selected (these IDs are page-scoped).
 - **Delete Method**: Delete a contact method by its method ID.
 
@@ -139,7 +139,7 @@ Different operations require different scopes:
 | Send Message | `messages:create` |
 | Upload Attachment | `messages:create` |
 | Read Messages | `messages:read` |
-| Create/Update Contact | `contacts:create`, `contacts:update` |
+| Create/Update Contact (incl. Custom Fields mapper) | `contacts:create`, `contacts:update` |
 | Delete Contact / Add or Delete Method / Set Custom Field | `contacts:update` (delete: `contacts:delete`) |
 | Read Contacts | `contacts:read` |
 | Read Custom Field Definitions | `settings:read` |
@@ -189,6 +189,15 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### Unreleased — Contact custom fields (Create/Update mapper + validated Set Custom Field)
+
+- **Added a "Custom Fields" resourceMapper** to Contact → Create and Contact → Update — one row per active custom field definition (name, type, and select options shown inline), loaded live via a new `getCustomFieldColumns` resource-mapping method (`GET /custom-fields?active_only=true`, paginated). Values are sent as `custom_fields: { <definition_id>: value }` on `POST`/`PUT /contacts`. Rows left unmapped, or mapped to a blank/empty value, are never sent (SendSeven treats blank the same as an explicit clear on update — an unmapped row must never accidentally wipe a field); an explicit `null` (e.g. from an expression) is passed through as a deliberate clear.
+- **Contact → Set Custom Field now routes through the validated bulk endpoint** (`PUT /contacts/{id}` with a single-key `custom_fields` map) instead of the legacy `POST /contacts/{id}/fields/{field_id}`, which had no type validation. Added a **Clear Field Instead** boolean for parity with the new bulk clear behavior. The **Custom Field** dropdown now filters to active fields only (`active_only: true`) and shows each field's type.
+- **Friendly 422 handling**: an invalid custom-field value (wrong type, not a valid select option, an unknown/deleted field definition, a duplicate, etc.) now raises a clear, per-field error naming the field instead of a generic HTTP failure — resolves the field id back to its current name via a fresh lookup. Never echoes the submitted value.
+- **Fixed a latent bug**: any 422 whose `detail` was a list of validation objects (not just custom-field errors) previously rendered as the literal string `"[object Object]"` in thrown errors; `getErrorMessage()` now joins each item's own `msg`.
+- Old backend compatibility: against a not-yet-deployed backend that silently drops `custom_fields` in the create/update body and ignores `active_only`, the mapper still loads (listing inactive fields too) and create/update requests still succeed — the extra `custom_fields` key is simply ignored, same as before this change. `getCustomFields`'s dropdown may list inactive fields until the backend recognizes `active_only`.
+- No existing parameter renamed or removed — purely additive. Not yet republished to npm.
 
 ### 1.5.0 — Team Chat Bots: send actions + trigger
 
