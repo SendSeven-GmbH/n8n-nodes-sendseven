@@ -34,7 +34,7 @@ import {
  */
 export class SendSevenTrigger implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'SendSeven WhatsApp & more',
+		displayName: 'SendSeven WhatsApp & more Trigger',
 		name: 'sendSevenTrigger',
 		icon: 'file:sendseven.svg',
 		group: ['trigger'],
@@ -42,7 +42,7 @@ export class SendSevenTrigger implements INodeType {
 		subtitle: '={{$parameter["event"]}}',
 		description: 'Send and receive WhatsApp Business API, Instagram, Telegram, Email etc. messages in a unified API',
 		defaults: {
-			name: 'SendSeven WhatsApp & more',
+			name: 'SendSeven WhatsApp & more Trigger',
 		},
 		inputs: [],
 		outputs: [NodeConnectionTypes.Main],
@@ -324,15 +324,36 @@ export class SendSevenTrigger implements INodeType {
 			case 'conversation.assigned':
 			case 'conversation.reopened': {
 				const conversation = data.conversation as IDataObject || data;
-				const contact = data.contact as IDataObject || {};
+				// Contact is top-level in newer payloads, nested under conversation in older ones
+				const contact = (data.contact as IDataObject) || (conversation.contact as IDataObject) || {};
 
 				formattedData = {
-					id: conversation.id || body.event_id,
+					// Prefer the per-event unique envelope id so reassignments are distinguishable
+					id: receivedEvent === 'conversation.assigned'
+						? (body.id || conversation.id || body.event_id)
+						: (conversation.id || body.event_id),
 					event: receivedEvent,
 					conversation: formatConversationResponse(conversation),
 					contact: contact.id ? formatContactResponse(contact) : null,
 					timestamp: (body.created_at || body.timestamp),
 				};
+
+				if (receivedEvent === 'conversation.assigned') {
+					const assignedTo = (data.assigned_to as IDataObject) || {};
+					const assignedBy = (data.assigned_by as IDataObject) || {};
+					const assignedUserId = data.assigned_user_id || assignedTo.id || assignedTo.user_id || conversation.assigned_user_id || null;
+					formattedData.assignedUserId = assignedUserId;
+					formattedData.assignedTo = assignedTo.id || assignedUserId
+						? { id: assignedUserId, name: assignedTo.name ?? null, email: assignedTo.email ?? null }
+						: null;
+					formattedData.assignedBy = assignedBy.id
+						? { id: assignedBy.id, name: assignedBy.name ?? null, email: assignedBy.email ?? null }
+						: null;
+					formattedData.previousAssignedUserId = data.previous_assigned_user_id ?? null;
+					formattedData.assignmentSource = data.assignment_source ?? null;
+					formattedData.flowId = data.flow_id ?? null;
+					formattedData.flowRunId = data.flow_run_id ?? null;
+				}
 				break;
 			}
 

@@ -627,7 +627,7 @@ export async function withCustomFieldErrorHandling<T>(
 		return await fn();
 	} catch (error) {
 		const issues = parseCustomFieldIssues(error);
-		if (!issues) throw error;
+		if (!issues) throw new NodeApiError(context.getNode(), error as JsonObject);
 
 		let idToName: Record<string, string> = {};
 		try {

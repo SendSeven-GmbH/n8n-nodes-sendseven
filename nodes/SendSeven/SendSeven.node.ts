@@ -670,7 +670,6 @@ export class SendSeven implements INodeType {
 				type: 'resourceMapper',
 				noDataExpression: true,
 				default: { mappingMode: 'defineBelow', value: null },
-				required: false,
 				typeOptions: {
 					resourceMapper: {
 						resourceMapperMethod: 'getCustomFieldColumns',
@@ -694,7 +693,6 @@ export class SendSeven implements INodeType {
 				type: 'resourceMapper',
 				noDataExpression: true,
 				default: { mappingMode: 'defineBelow', value: null },
-				required: false,
 				typeOptions: {
 					resourceMapper: {
 						resourceMapperMethod: 'getCustomFieldColumns',
