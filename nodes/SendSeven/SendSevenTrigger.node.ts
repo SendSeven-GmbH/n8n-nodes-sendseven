@@ -439,6 +439,36 @@ export class SendSevenTrigger implements INodeType {
 				break;
 			}
 
+			case 'attachment.summarized': {
+				// summary.text / sections come from a customer-sent file: untrusted data.
+				const summary = (data.summary as IDataObject) || {};
+
+				formattedData = {
+					id: body.event_id || body.id,
+					event: receivedEvent,
+					attachmentId: data.attachment_id,
+					messageId: data.message_id,
+					conversationId: data.conversation_id,
+					contactId: data.contact_id,
+					channelId: data.channel_id,
+					summary: {
+						status: summary.status,
+						kind: summary.kind,
+						text: summary.text,
+						sections: summary.sections,
+						pagesRead: summary.pages_read,
+						pagesTotal: summary.pages_total,
+						truncated: summary.truncated,
+						model: summary.model,
+						source: summary.source,
+						createdAt: summary.created_at,
+						updatedAt: summary.updated_at,
+					},
+					timestamp: (body.created_at || body.timestamp),
+				};
+				break;
+			}
+
 			case 'link.clicked': {
 				formattedData = {
 					id: body.event_id,

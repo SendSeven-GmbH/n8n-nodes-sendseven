@@ -328,6 +328,7 @@ export const WEBHOOK_EVENTS = [
 	{ name: 'Contact Subscribed', value: 'contact.subscribed' },
 	{ name: 'Contact Unsubscribed', value: 'contact.unsubscribed' },
 	{ name: 'Link Clicked', value: 'link.clicked' },
+	{ name: 'Attachment Summarized (AI Summary of an Image or PDF)', value: 'attachment.summarized' },
 	{ name: 'Team Chat Message Created (Channels Only - No DM Event)', value: 'team_chat.message.created' },
 ];
 

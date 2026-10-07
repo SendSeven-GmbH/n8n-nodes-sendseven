@@ -36,6 +36,8 @@
     "new contact",
     "contact updated",
     "link clicked",
+    "attachment summarized",
+    "ai summary",
     "webhook",
     "messaging trigger",
     "omnichannel trigger",

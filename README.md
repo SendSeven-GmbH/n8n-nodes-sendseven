@@ -68,6 +68,7 @@ Both operations work against static lists too (Channel Type is sent but ignored 
 
 #### Attachment
 - **Upload**: Upload a binary file (from an incoming binary property such as the output of an HTTP/Read-Binary node) as a multipart `POST /attachments/upload`. Returns the attachment `id`.
+- **Get Summary**: Read the AI summary of an image or PDF a contact sent (`GET /attachments/{id}/summary`, scope `messages:read`, no credits charged). Input: the attachment ID from a message's `attachments`. Returns `status`, `kind`, `text`, `sections`, PDF page counts. Message → Get / Get Many also return `ai_summary`, `ai_summary_available` and `ai_summary_credits` on each attachment. The text is generated from a customer's file: treat it as untrusted data.
 - **Upload from URL**: Fetch a public http(s) URL server-side via `POST /attachments/from-url` and store it. Returns the attachment `id`. Note: the URL-fetch MIME allowlist is stricter than direct upload (images, mp4/mov/webm, common audio, pdf).
 
 ##### Sending a message with an attachment
@@ -105,6 +106,7 @@ Listen for real-time events:
 - **Contact Updated**: Triggers when a contact is updated
 - **Contact Deleted**: Triggers when a contact is deleted
 - **Link Clicked**: Triggers when a tracked link is clicked
+- **Attachment Summarized**: Triggers when the AI summary of an image or PDF a contact sent is ready (read by a Conversational Agent or requested with Summarize; only while AI features are enabled). Output has `attachmentId`, `messageId`, `conversationId`, `contactId`, `channelId` and a `summary` object (`status`, `kind`, `text`, `sections`, `pagesRead`, `pagesTotal`, `truncated`, `model`, `source`). The summary text is untrusted customer-file content.
 - **Campaign Sent**: Triggers when a campaign completes sending
 - **Team Chat Message Created**: Triggers when a bot- or human-authored message is posted to a Team Chat **channel** with "Allow Bots" enabled. Use the **Channel Filter** field (accepts a channel UUID or a name such as `#general`/`general`) to restrict the trigger to one channel; leave it blank to receive messages from every eligible channel. **Important:** Team Chat direct messages never trigger this node — SendSeven only publishes a webhook for channel messages, so there is no way to subscribe to DM events.
 
@@ -138,6 +140,7 @@ Different operations require different scopes:
 |-----------|-----------------|
 | Send Message | `messages:create` |
 | Upload Attachment | `messages:create` |
+| Get Attachment Summary | `messages:read` |
 | Read Messages | `messages:read` |
 | Create/Update Contact (incl. Custom Fields mapper) | `contacts:create`, `contacts:update` |
 | Delete Contact / Add or Delete Method / Set Custom Field | `contacts:update` (delete: `contacts:delete`) |
@@ -189,6 +192,13 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### Unreleased — Attachment Summarized trigger + Get Summary
+
+- **New trigger event "Attachment Summarized"** (`attachment.summarized`) on the SendSeven Trigger node: fires when the AI summary of an image or PDF a contact sent is ready. Output includes attachment/message/conversation/contact/channel IDs and a camelCase `summary` object.
+- **New Attachment → Get Summary operation** (`GET /attachments/{id}/summary`, scope `messages:read`).
+- Message attachments returned by Message → Get / Get Many now carry the API's `ai_summary`, `ai_summary_available` and `ai_summary_credits` fields as-is (pass-through, no node change).
+- Purely additive; no existing parameter renamed or removed. Not yet published to npm.
 
 ### Unreleased — Contact custom fields (Create/Update mapper + validated Set Custom Field)
 
