@@ -347,6 +347,8 @@ export function formatContactResponse(contact: IDataObject): IDataObject {
 		contactMethods: contact.contact_methods,
 		customFields: contact.custom_fields,
 		tags: contact.tags,
+		ownerUserId: contact.owner_user_id ?? null,
+		owner: contact.owner ?? null,
 		lastContactedAt: contact.last_contacted_at,
 		createdAt: contact.created_at,
 		updatedAt: contact.updated_at,

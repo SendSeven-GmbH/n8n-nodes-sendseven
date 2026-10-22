@@ -33,14 +33,19 @@ npm install n8n-nodes-sendseven
 #### Contact
 - **Create**: Create a new contact. A **Custom Fields** mapper lets you set any of the tenant's active custom fields (by definition, one row per field, typed per its `field_type`) at the same time — leave a row unmapped to skip it.
 - **Update**: Update an existing contact (name, email, phone, avatar URL). Has its own **Custom Fields** mapper (same as Create). Blank/unmapped rows are never sent — SendSeven treats blank the same as clearing the field on update, so an untouched row must never risk wiping it. To deliberately clear a field, use **Set Custom Field**'s Clear Field option instead, or map an expression that evaluates to a real `null`.
-- **Get**: Get a contact by ID
+- **Get**: Get a contact by ID (output includes `ownerUserId` and `owner` with the owner's availability state)
 - **Delete**: Delete a contact (GDPR delete — conversations anonymized, billing preserved)
-- **Search**: Search contacts by name, email, or phone
+- **Search**: Search contacts by name, email, or phone. **Owner Filter** limits results to contacts owned by a specific team member, by you (**Me**), or by nobody (**No Owner**).
 - **Add Tag**: Add a tag to a contact
 - **Remove Tag**: Remove a tag from a contact
 - **Set Custom Field**: Set (or, with **Clear Field Instead**, clear) a single custom field on a contact. The **Custom Field** dropdown is populated from your tenant's active field definitions (`GET /custom-fields?active_only=true`). The value is written via `PUT /contacts/{id}` with `{ custom_fields: { <field_id>: value } }` — the same validated bulk endpoint as Create/Update — so an invalid value (wrong type, not one of a select's options, an unknown/deleted field, etc.) fails with a clear, per-field error instead of silently accepting bad data. This replaced the legacy `POST /contacts/{id}/fields/{field_id}` write, which has no server-side type validation.
 - **Add Method**: Add a contact method (platform ID). Method types: `phone`, `email`, `whatsapp_id`, `telegram_id`, `messenger_id`, `instagram_id`. For `messenger_id`/`instagram_id` a **Channel** must be selected (these IDs are page-scoped).
 - **Delete Method**: Delete a contact method by its method ID.
+
+#### My Availability
+Acts as the user who owns the API key / OAuth connection (no extra scope needed).
+- **Set Out of Office**: Switch your own out of office on or schedule it (`POST /users/me/absences`). Pick a **Substitute** (specific team member, round robin / least busy in an inbox or with a tag, or none); optional **Starts At**, **Ends At** (empty = until switched off) and an internal **Note**. While you are away, new conversations of your contacts and your assigned conversations that receive a customer message move to the substitute.
+- **End Out of Office**: End your running out of office now (`POST /users/me/absences/end-now`).
 
 #### Conversation
 - **Get**: Get a conversation by ID
@@ -145,6 +150,7 @@ Different operations require different scopes:
 | Create/Update Contact (incl. Custom Fields mapper) | `contacts:create`, `contacts:update` |
 | Delete Contact / Add or Delete Method / Set Custom Field | `contacts:update` (delete: `contacts:delete`) |
 | Read Contacts | `contacts:read` |
+| Set / End Out of Office | none (acts as the connected user) |
 | Read Custom Field Definitions | `settings:read` |
 | Manage Tags | `tags:read` |
 | Read Conversations | `conversations:read` |
@@ -192,6 +198,14 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### 1.6.0 — Contact Owner + Out of Office
+
+- **Contact → Create / Update**: new **Owner** (team member dropdown or user ID expression) in Additional Fields. Create sends it in the single `POST /contacts`. Update also has **Remove Owner** (sends `null`).
+- **Contact → Search**: new **Owner Filter** (Any, Me, No Owner, Specific User) using the `owner_user_id` list filter.
+- Contact output now includes `ownerUserId` and `owner`.
+- **New My Availability resource**: Set Out of Office (with optional substitute) and End Out of Office for the connected user.
+- Conversation Assigned trigger: `assignmentSource` is passed through unchanged, so the new values `contact_owner` and `substitute` appear without changes.
 
 ### Unreleased — Attachment Summarized trigger + Get Summary
 

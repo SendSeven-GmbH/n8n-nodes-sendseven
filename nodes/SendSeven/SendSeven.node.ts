@@ -138,6 +138,10 @@ export class SendSeven implements INodeType {
 						value: 'list',
 					},
 					{
+						name: 'My Availability',
+						value: 'availability',
+					},
+					{
 						name: 'Message',
 						value: 'message',
 					},
@@ -199,6 +203,141 @@ export class SendSeven implements INodeType {
 					},
 				],
 				default: 'send',
+			},
+			// My Availability operations (act as the connected user; no scope needed)
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['availability'],
+					},
+				},
+				options: [
+					{
+						name: 'End Out of Office',
+						value: 'endOutOfOffice',
+						description: 'End your running out of office now',
+						action: 'End out of office',
+					},
+					{
+						name: 'Set Out of Office',
+						value: 'setOutOfOffice',
+						description: 'Switch your own out of office on, or schedule it',
+						action: 'Set out of office',
+					},
+				],
+				default: 'setOutOfOffice',
+			},
+			{
+				displayName: 'Substitute',
+				name: 'substituteMode',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['availability'],
+						operation: ['setOutOfOffice'],
+					},
+				},
+				options: [
+					{ name: 'Least Busy Agent in Inbox', value: 'least_busy_inbox' },
+					{ name: 'Least Busy Agent with Tag', value: 'least_busy_tag' },
+					{ name: 'No Substitute', value: 'none' },
+					{ name: 'Round Robin in Inbox', value: 'round_robin_inbox' },
+					{ name: 'Round Robin with Tag', value: 'round_robin_tag' },
+					{ name: 'Specific Team Member', value: 'user' },
+				],
+				default: 'none',
+				description: 'Who takes over your contacts\' conversations while you are away',
+			},
+			{
+				displayName: 'Substitute Name or ID',
+				name: 'substituteUserId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getUsers',
+				},
+				displayOptions: {
+					show: {
+						resource: ['availability'],
+						operation: ['setOutOfOffice'],
+						substituteMode: ['user'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'Choose from the list, or specify a user ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+			},
+			{
+				displayName: 'Inbox ID',
+				name: 'substituteInboxId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['availability'],
+						operation: ['setOutOfOffice'],
+						substituteMode: ['round_robin_inbox', 'least_busy_inbox'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'The inbox whose agents take over',
+			},
+			{
+				displayName: 'Tag Name or ID',
+				name: 'substituteTagId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getTags',
+				},
+				displayOptions: {
+					show: {
+						resource: ['availability'],
+						operation: ['setOutOfOffice'],
+						substituteMode: ['round_robin_tag', 'least_busy_tag'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'absenceAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add Field',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: ['availability'],
+						operation: ['setOutOfOffice'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Ends At',
+						name: 'endsAt',
+						type: 'dateTime',
+						default: '',
+						description: 'When the out of office ends. Leave empty for "until switched off".',
+					},
+					{
+						displayName: 'Note',
+						name: 'note',
+						type: 'string',
+						default: '',
+						description: 'Internal reason (max 255 characters), never shown to customers',
+					},
+					{
+						displayName: 'Starts At',
+						name: 'startsAt',
+						type: 'dateTime',
+						default: '',
+						description: 'When the out of office starts. Defaults to now.',
+					},
+				],
 			},
 			// Contact operations
 			{
@@ -596,6 +735,43 @@ export class SendSeven implements INodeType {
 				placeholder: '+1234567890',
 			},
 			{
+				displayName: 'Owner Filter',
+				name: 'ownerFilter',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['search'],
+					},
+				},
+				options: [
+					{ name: 'Any', value: 'any' },
+					{ name: 'Me (Connected User)', value: 'me' },
+					{ name: 'No Owner', value: 'none' },
+					{ name: 'Specific User', value: 'user' },
+				],
+				default: 'any',
+				description: 'Only return contacts with this owner',
+			},
+			{
+				displayName: 'Owner Name or ID',
+				name: 'ownerFilterUserId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getUsers',
+				},
+				displayOptions: {
+					show: {
+						resource: ['contact'],
+						operation: ['search'],
+						ownerFilter: ['user'],
+					},
+				},
+				default: '',
+				required: true,
+				description: 'Choose from the list, or specify a user ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+			},
+			{
 				displayName: 'Search Query',
 				name: 'searchQuery',
 				type: 'string',
@@ -639,6 +815,16 @@ export class SendSeven implements INodeType {
 				},
 				options: [
 					{
+						displayName: 'Owner Name or ID',
+						name: 'ownerUserId',
+						type: 'options',
+						typeOptions: {
+							loadOptionsMethod: 'getUsers',
+						},
+						default: '',
+						description: 'The team member who owns this contact. Their out-of-office substitute handles the contact\'s conversations while they are away. Choose from the list, or specify a user ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+					},
+					{
 						displayName: 'Contact Methods',
 						name: 'contactMethods',
 						type: 'json',
@@ -660,6 +846,23 @@ export class SendSeven implements INodeType {
 					},
 				},
 				options: [
+					{
+						displayName: 'Owner Name or ID',
+						name: 'ownerUserId',
+						type: 'options',
+						typeOptions: {
+							loadOptionsMethod: 'getUsers',
+						},
+						default: '',
+						description: 'The team member who owns this contact. Their out-of-office substitute handles the contact\'s conversations while they are away. Choose from the list, or specify a user ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+					},
+					{
+						displayName: 'Remove Owner',
+						name: 'removeOwner',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to clear the contact\'s owner (sends null). Takes precedence over Owner.',
+					},
 					{
 						displayName: 'Avatar URL',
 						name: 'avatarUrl',
@@ -1592,6 +1795,8 @@ export class SendSeven implements INodeType {
 								: additionalFields.contactMethods;
 						}
 
+						if (additionalFields.ownerUserId) body.owner_user_id = additionalFields.ownerUserId;
+
 						const customFieldsMapper = this.getNodeParameter('customFields', i, {}) as IDataObject;
 						const customFields = collectCustomFieldsFromMapperValue(
 							customFieldsMapper.value as IDataObject | null,
@@ -1621,6 +1826,12 @@ export class SendSeven implements INodeType {
 
 						const additionalFields = this.getNodeParameter('additionalFieldsUpdate', i, {}) as IDataObject;
 						if (additionalFields.avatarUrl) body.avatar_url = additionalFields.avatarUrl;
+						// Owner: explicit null clears (Remove Owner wins); empty = leave unchanged
+						if (additionalFields.removeOwner === true) {
+							body.owner_user_id = null;
+						} else if (additionalFields.ownerUserId) {
+							body.owner_user_id = additionalFields.ownerUserId;
+						}
 
 						const customFieldsMapper = this.getNodeParameter('customFieldsUpdate', i, {}) as IDataObject;
 						const customFields = collectCustomFieldsFromMapperValue(
@@ -1657,6 +1868,16 @@ export class SendSeven implements INodeType {
 						// specific value into `search` (precedence: search > email > phone).
 						const searchValue = searchQuery || email || phone;
 						if (searchValue) query.search = searchValue;
+
+						// Owner filter: user id | 'me' | 'none'
+						const ownerFilter = this.getNodeParameter('ownerFilter', i, 'any') as string;
+						if (ownerFilter === 'me' || ownerFilter === 'none') {
+							query.owner_user_id = ownerFilter;
+						} else if (ownerFilter === 'user') {
+							const ownerId = this.getNodeParameter('ownerFilterUserId', i, '') as string;
+							validateRequiredFields(this, { ownerId }, ['ownerId']);
+							query.owner_user_id = ownerId;
+						}
 
 						if (returnAll) {
 							responseData = await sendSevenApiRequestAllItems.call(this, '/contacts', query);
@@ -2110,6 +2331,35 @@ export class SendSeven implements INodeType {
 							'GET',
 							`/attachments/${encodeURIComponent(attachmentId)}/summary`,
 						);
+					}
+				}
+
+				// ==================== MY AVAILABILITY ====================
+				else if (resource === 'availability') {
+					if (operation === 'setOutOfOffice') {
+						const mode = this.getNodeParameter('substituteMode', i, 'none') as string;
+						const extra = this.getNodeParameter('absenceAdditionalFields', i, {}) as IDataObject;
+						const body: IDataObject = { substitute_mode: mode };
+						if (mode === 'user') {
+							const id = this.getNodeParameter('substituteUserId', i, '') as string;
+							validateRequiredFields(this, { id }, ['id']);
+							body.substitute_user_id = id;
+						} else if (mode === 'round_robin_inbox' || mode === 'least_busy_inbox') {
+							const id = this.getNodeParameter('substituteInboxId', i, '') as string;
+							validateRequiredFields(this, { id }, ['id']);
+							body.substitute_inbox_id = id;
+						} else if (mode === 'round_robin_tag' || mode === 'least_busy_tag') {
+							const id = this.getNodeParameter('substituteTagId', i, '') as string;
+							validateRequiredFields(this, { id }, ['id']);
+							body.substitute_tag_id = id;
+						}
+						if (extra.startsAt) body.starts_at = new Date(extra.startsAt as string).toISOString();
+						if (extra.endsAt) body.ends_at = new Date(extra.endsAt as string).toISOString();
+						if (extra.note) body.note = extra.note;
+
+						responseData = await sendSevenApiRequest.call(this, 'POST', '/users/me/absences', body);
+					} else if (operation === 'endOutOfOffice') {
+						responseData = await sendSevenApiRequest.call(this, 'POST', '/users/me/absences/end-now');
 					}
 				}
 
