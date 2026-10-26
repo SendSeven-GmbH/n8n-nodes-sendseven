@@ -199,6 +199,12 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### 1.6.1 — n8n review fixes
+
+- Resource list sorted alphabetically (My Availability after Message).
+- Substitute and Owner dropdowns use the standard "Choose from the list, or specify an ID" description; the Owner explanation moved to a hint.
+- Dev dependencies updated to clear `npm audit` findings.
+
 ### 1.6.0 — Contact Owner + Out of Office
 
 - **Contact → Create / Update**: new **Owner** (team member dropdown or user ID expression) in Additional Fields. Create sends it in the single `POST /contacts`. Update also has **Remove Owner** (sends `null`).
@@ -207,21 +213,21 @@ MIT License - see LICENSE file for details.
 - **New My Availability resource**: Set Out of Office (with optional substitute) and End Out of Office for the connected user.
 - Conversation Assigned trigger: `assignmentSource` is passed through unchanged, so the new values `contact_owner` and `substitute` appear without changes.
 
-### Unreleased — Attachment Summarized trigger + Get Summary
+### 1.6.0 — Attachment Summarized trigger + Get Summary
 
 - **New trigger event "Attachment Summarized"** (`attachment.summarized`) on the SendSeven Trigger node: fires when the AI summary of an image or PDF a contact sent is ready. Output includes attachment/message/conversation/contact/channel IDs and a camelCase `summary` object.
 - **New Attachment → Get Summary operation** (`GET /attachments/{id}/summary`, scope `messages:read`).
 - Message attachments returned by Message → Get / Get Many now carry the API's `ai_summary`, `ai_summary_available` and `ai_summary_credits` fields as-is (pass-through, no node change).
-- Purely additive; no existing parameter renamed or removed. Not yet published to npm.
+- Purely additive; no existing parameter renamed or removed.
 
-### Unreleased — Contact custom fields (Create/Update mapper + validated Set Custom Field)
+### 1.6.0 — Contact custom fields (Create/Update mapper + validated Set Custom Field)
 
 - **Added a "Custom Fields" resourceMapper** to Contact → Create and Contact → Update — one row per active custom field definition (name, type, and select options shown inline), loaded live via a new `getCustomFieldColumns` resource-mapping method (`GET /custom-fields?active_only=true`, paginated). Values are sent as `custom_fields: { <definition_id>: value }` on `POST`/`PUT /contacts`. Rows left unmapped, or mapped to a blank/empty value, are never sent (SendSeven treats blank the same as an explicit clear on update — an unmapped row must never accidentally wipe a field); an explicit `null` (e.g. from an expression) is passed through as a deliberate clear.
 - **Contact → Set Custom Field now routes through the validated bulk endpoint** (`PUT /contacts/{id}` with a single-key `custom_fields` map) instead of the legacy `POST /contacts/{id}/fields/{field_id}`, which had no type validation. Added a **Clear Field Instead** boolean for parity with the new bulk clear behavior. The **Custom Field** dropdown now filters to active fields only (`active_only: true`) and shows each field's type.
 - **Friendly 422 handling**: an invalid custom-field value (wrong type, not a valid select option, an unknown/deleted field definition, a duplicate, etc.) now raises a clear, per-field error naming the field instead of a generic HTTP failure — resolves the field id back to its current name via a fresh lookup. Never echoes the submitted value.
 - **Fixed a latent bug**: any 422 whose `detail` was a list of validation objects (not just custom-field errors) previously rendered as the literal string `"[object Object]"` in thrown errors; `getErrorMessage()` now joins each item's own `msg`.
 - Old backend compatibility: against a not-yet-deployed backend that silently drops `custom_fields` in the create/update body and ignores `active_only`, the mapper still loads (listing inactive fields too) and create/update requests still succeed — the extra `custom_fields` key is simply ignored, same as before this change. `getCustomFields`'s dropdown may list inactive fields until the backend recognizes `active_only`.
-- No existing parameter renamed or removed — purely additive. Not yet republished to npm.
+- No existing parameter renamed or removed — purely additive.
 
 ### 1.5.0 — Team Chat Bots: send actions + trigger
 
@@ -229,11 +235,11 @@ MIT License - see LICENSE file for details.
 - **Added `team_chat.message.created`** to the Trigger node's Events dropdown, with a new **Channel Filter** field (channel UUID or `#name`) matched client-side against both the channel ID and name. Direct messages never trigger this node — SendSeven only emits a webhook for channel messages.
 - **Added the `teamchat:write` OAuth2 scope** (bot-only; deliberately no underscore, distinct from the human `team_chat:*` scopes) to the SendSeven OAuth2 credential. Existing OAuth2-authenticated workflows must reconnect the credential once to pick up the new scope before these actions/trigger will work.
 
-### Unreleased — Contact Subscribed / Unsubscribed trigger events
+### 1.6.0 — Contact Subscribed / Unsubscribed trigger events
 
 - **Added `contact.subscribed` and `contact.unsubscribed`** to the Trigger node's Events dropdown — previously these backend events existed and already fired in production, but were not selectable here at all, so no n8n workflow could react to a newsletter opt-in/opt-out.
 - Added a matching `switch` case in `webhook()` that formats the payload's `data.subscription` object (`list_id`, `list_name`, `channel_type`, `channel_id`, `status`, `opt_in_method`) into a `subscription` field alongside the standard `contact` field, instead of falling through to the generic `default:` passthrough.
-- No new backend event or request-shape change — purely additive to the trigger node. Not yet republished to npm.
+- No new backend event or request-shape change — purely additive to the trigger node.
 
 ### 1.4.1
 
@@ -247,12 +253,12 @@ MIT License - see LICENSE file for details.
 - Added `getLists` loadOptions dropdown (`GET /lists`).
 - Purely additive — no existing resource, operation, or field changed. Existing workflows are unaffected.
 
-### Unreleased — Multi-attachment fan-out (copy update, not yet republished)
+### 1.6.0 — Multi-attachment fan-out (copy update)
 
 - **Message → Send**: docs/descriptions no longer imply attachments beyond the first are dropped. `POST /messages` now fans out N attachments into N separate messages (in order, text on the first) instead of silently discarding parts 2..N — the **Attachment IDs** field's documented "comma-separated UUIDs" behavior is now actually true for more than one ID.
 - **Additive response field**: `formatMessageResponse` now also returns `relatedMessageIds` (array of message IDs, parts 2..N, empty by default). No existing field changed or removed.
 - **Billing note**: sending N attachments now creates N billable messages instead of 1 (except on an Email channel, which still sends one email with all attachments as MIME parts).
-- No request-shape or client-side parsing changes — the comma-split logic already produced a flat UUID array, which is unaffected. Not yet published to npm.
+- No request-shape or client-side parsing changes — the comma-split logic already produced a flat UUID array, which is unaffected.
 
 ### 1.2.4
 
