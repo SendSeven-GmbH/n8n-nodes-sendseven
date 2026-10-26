@@ -1340,7 +1340,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				description:
-					'The contact to send the template to (uses its first WhatsApp method, phone as fallback). Optional: provide at least ONE recipient — Contact ID, WhatsApp ID, Contact Method ID (in Additional Options), or Conversation ID (in Additional Options). Use the Contact resource Search/Create to obtain an ID.',
+					'The contact to send the template to (uses its first WhatsApp ID; fails if it has none, then use WhatsApp ID). Optional: provide at least ONE recipient — Contact ID, WhatsApp ID, Contact Method ID (in Additional Options), or Conversation ID (in Additional Options). Use the Contact resource Search/Create to obtain an ID.',
 			},
 			{
 				displayName: 'WhatsApp ID',
@@ -1354,7 +1354,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				description:
-					'Send straight to a phone number (without a leading "+", which is stripped automatically) OR an alphanumeric WhatsApp ID. An existing contact is matched, or a new one is created. Great for stateless integrations. Alternative to Contact ID.',
+					'Send straight to a WhatsApp number (without a leading "+", which is stripped automatically) OR an alphanumeric WhatsApp ID. It is added to the Contact ID's contact, or a new contact may be created. Great for stateless integrations. Alternative to Contact ID.',
 			},
 			{
 				displayName: 'Template Name or ID',

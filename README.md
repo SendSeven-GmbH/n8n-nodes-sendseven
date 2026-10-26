@@ -63,8 +63,8 @@ Both operations work against static lists too (Channel Type is sent but ignored 
 
 #### WhatsApp Template
 - **Send**: Send a pre-approved WhatsApp template message. Provide **at least one recipient** (Contact ID is no longer mandatory):
-  - **Contact ID** — a contact; uses its first WhatsApp method, phone as fallback.
-  - **WhatsApp ID** — a phone number without a leading `+` (stripped automatically) or an alphanumeric WhatsApp ID; matches an existing contact or creates one (ideal for stateless integrations).
+  - **Contact ID** — a contact; uses its first WhatsApp ID. A contact without one fails; pass the number as **WhatsApp ID** instead.
+  - **WhatsApp ID** — a WhatsApp number without a leading `+` (stripped automatically) or an alphanumeric WhatsApp ID. With a Contact ID it is added to that contact as a WhatsApp ID; without one a new contact may be created (ideal for stateless integrations).
   - **Contact Method ID** (Additional Options) — target a specific WhatsApp number when a contact has several; must be a `whatsapp_id`-type method. If Contact ID is also set it must name the same contact.
   - **Conversation ID** (Additional Options) — send within an existing WhatsApp conversation.
 
