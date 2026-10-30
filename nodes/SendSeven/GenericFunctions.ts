@@ -213,7 +213,13 @@ function getErrorMessage(error: unknown): string {
 					return messages.join('; ');
 				}
 			}
-			if (body.detail) {
+			// Object detail, e.g. 409 {detail: {detail: 'contact_already_exists', message}}
+			if (body.detail && typeof body.detail === 'object' && !Array.isArray(body.detail)) {
+				const d = body.detail as IDataObject;
+				const m = d.message || d.detail;
+				if (m) return String(m);
+			}
+			if (body.detail && typeof body.detail !== 'object') {
 				return String(body.detail);
 			}
 			if (body.message) {
