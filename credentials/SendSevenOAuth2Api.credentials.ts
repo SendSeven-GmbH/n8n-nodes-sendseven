@@ -11,6 +11,7 @@ import type { ICredentialType, INodeProperties, Icon } from 'n8n-workflow';
  * - conversations:read, conversations:update
  * - contacts:read, contacts:create, contacts:update
  * - tags:read
+ * - custom_fields:read (Custom Fields resourceMapper)
  * - webhooks:create, webhooks:read, webhooks:delete
  * - channels:read
  * - knowledge_base:read
@@ -49,7 +50,7 @@ export class SendSevenOAuth2Api implements ICredentialType {
 			displayName: 'Scope',
 			name: 'scope',
 			type: 'hidden',
-			default: 'messages:read messages:create conversations:read conversations:update contacts:read contacts:create contacts:update tags:read webhooks:create webhooks:read webhooks:delete channels:read knowledge_base:read team:read lists:update teamchat:write',
+			default: 'messages:read messages:create conversations:read conversations:update contacts:read contacts:create contacts:update tags:read custom_fields:read webhooks:create webhooks:read webhooks:delete channels:read knowledge_base:read team:read lists:update teamchat:write',
 		},
 		{
 			displayName: 'Auth URI Query Parameters',

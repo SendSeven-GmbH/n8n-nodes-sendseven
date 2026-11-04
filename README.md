@@ -151,7 +151,7 @@ Different operations require different scopes:
 | Delete Contact / Add or Delete Method / Set Custom Field | `contacts:update` (delete: `contacts:delete`) |
 | Read Contacts | `contacts:read` |
 | Set / End Out of Office | none (acts as the connected user) |
-| Read Custom Field Definitions | `settings:read` |
+| Read Custom Field Definitions | `custom_fields:read` |
 | Manage Tags | `tags:read` |
 | Read Conversations | `conversations:read` |
 | Manage Conversations | `conversations:update` |
@@ -198,6 +198,13 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### 1.6.2 — WhatsApp ID sending, 409 errors, custom_fields:read
+
+- WhatsApp Template send: **Contact ID** uses the contact's first WhatsApp ID (fails if it has none; pass the number as **WhatsApp ID** instead). **WhatsApp ID** (number without `+`, or alphanumeric ID) is added to the Contact ID's contact, or a new contact may be created.
+- Clearer error messages for object-shaped API errors such as 409 `contact_already_exists`.
+- OAuth2 default scope now includes `custom_fields:read`; Read Custom Field Definitions requires `custom_fields:read` (was `settings:read`).
+- Fixed a build error (unescaped apostrophe in a field description).
 
 ### 1.6.1 — n8n review fixes
 

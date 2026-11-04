@@ -1354,7 +1354,7 @@ export class SendSeven implements INodeType {
 				},
 				default: '',
 				description:
-					'Send straight to a WhatsApp number (without a leading "+", which is stripped automatically) OR an alphanumeric WhatsApp ID. It is added to the Contact ID's contact, or a new contact may be created. Great for stateless integrations. Alternative to Contact ID.',
+					'Send straight to a WhatsApp number (without a leading "+", which is stripped automatically) OR an alphanumeric WhatsApp ID. It is added to the Contact ID\'s contact, or a new contact may be created. Great for stateless integrations. Alternative to Contact ID.',
 			},
 			{
 				displayName: 'Template Name or ID',
