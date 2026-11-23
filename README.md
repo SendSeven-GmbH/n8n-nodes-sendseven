@@ -199,6 +199,10 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### 1.7.0 — Tag events
+
+- SendSeven Trigger: new events **Conversation Tag Added / Removed** and **Contact Tag Added / Removed** (one event per tag). Output has `tag` (`id`, `name`; conversation events also `color`), the conversation or contact, its current `tags`, and `origin`.
+
 ### 1.6.2 — WhatsApp ID sending, 409 errors, custom_fields:read
 
 - WhatsApp Template send: **Contact ID** uses the contact's first WhatsApp ID (fails if it has none; pass the number as **WhatsApp ID** instead). **WhatsApp ID** (number without `+`, or alphanumeric ID) is added to the Contact ID's contact, or a new contact may be created.

@@ -357,6 +357,27 @@ export class SendSevenTrigger implements INodeType {
 				break;
 			}
 
+			case 'conversation.tag_added':
+			case 'conversation.tag_removed': {
+				const conversation = data.conversation as IDataObject || {};
+				const contact = (data.contact as IDataObject) || (conversation.contact as IDataObject) || {};
+				const tag = (data.tag as IDataObject) || {};
+				formattedData = {
+					id: body.id || body.event_id,
+					event: receivedEvent,
+					conversation: formatConversationResponse(conversation),
+					conversationId: conversation.id ?? null,
+					tags: conversation.tags ?? [],
+					contactId: conversation.contact_id ?? contact.id ?? null,
+					contact: contact.id ? formatContactResponse(contact) : null,
+					tag: { id: tag.id ?? null, name: tag.name ?? null, color: tag.color ?? null },
+					actor: data.actor ?? null,
+					origin: data.origin ?? null,
+					timestamp: (body.created_at || body.timestamp),
+				};
+				break;
+			}
+
 			case 'contact.created':
 			case 'contact.updated':
 			case 'contact.deleted': {
@@ -366,6 +387,23 @@ export class SendSevenTrigger implements INodeType {
 					id: contact.id || body.event_id,
 					event: receivedEvent,
 					contact: formatContactResponse(contact),
+					timestamp: (body.created_at || body.timestamp),
+				};
+				break;
+			}
+
+			case 'contact.tag_added':
+			case 'contact.tag_removed': {
+				const contact = data.contact as IDataObject || {};
+				const tag = (data.tag as IDataObject) || {};
+				formattedData = {
+					id: body.id || body.event_id,
+					event: receivedEvent,
+					contactId: contact.id ?? null,
+					contact: contact.id ? formatContactResponse(contact) : null,
+					tag: { id: tag.id ?? null, name: tag.name ?? null },
+					tags: contact.tags ?? [],
+					origin: data.origin ?? null,
 					timestamp: (body.created_at || body.timestamp),
 				};
 				break;
