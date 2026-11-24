@@ -1216,6 +1216,25 @@ export class SendSeven implements INodeType {
 				description: 'Which bot/page this subscription belongs to — required for Telegram, Messenger, and Instagram (page/bot-scoped channels). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 
+			{
+				displayName: 'Tracking Consent',
+				name: 'listTrackingConsent',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['list'],
+						operation: ['addMember'],
+					},
+				},
+				options: [
+					{ name: 'Keep Current Value', value: '' },
+					{ name: 'Granted', value: 'granted' },
+					{ name: 'Denied', value: 'denied' },
+				],
+				default: '',
+				description: 'Consent to open and click tracking for this email address (needed for EU, UK and Swiss recipients). Leave empty to keep the current value.',
+			},
+
 			// ==================== TEAM CHAT FIELDS ====================
 			{
 				displayName: 'Channel',
@@ -2121,6 +2140,8 @@ export class SendSeven implements INodeType {
 						// for static lists; required for newsletter lists.
 						const body: IDataObject = { contact_id: contactId, channel_type: channelType };
 						if (channelId) body.channel_id = channelId;
+						const trackingConsent = this.getNodeParameter('listTrackingConsent', i, '') as string;
+						if (trackingConsent) body.tracking_consent = trackingConsent;
 
 						responseData = await sendSevenApiRequest.call(
 							this,

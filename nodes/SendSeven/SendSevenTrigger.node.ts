@@ -431,6 +431,21 @@ export class SendSevenTrigger implements INodeType {
 				break;
 			}
 
+			case 'contact.tracking_consent_changed': {
+				formattedData = {
+					id: data.contact_id || body.event_id,
+					event: receivedEvent,
+					contactId: data.contact_id,
+					email: data.email,
+					status: data.status,
+					previousStatus: data.previous_status,
+					source: data.source,
+					changedAt: data.changed_at,
+					timestamp: (body.created_at || body.timestamp),
+				};
+				break;
+			}
+
 			case 'email.received':
 			case 'email.sent':
 			case 'email.delivered':

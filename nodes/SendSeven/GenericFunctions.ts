@@ -335,6 +335,7 @@ export const WEBHOOK_EVENTS = [
 	{ name: 'Contact Deleted', value: 'contact.deleted' },
 	{ name: 'Contact Subscribed', value: 'contact.subscribed' },
 	{ name: 'Contact Unsubscribed', value: 'contact.unsubscribed' },
+	{ name: 'Contact Tracking Consent Changed', value: 'contact.tracking_consent_changed' },
 	{ name: 'Contact Tag Added', value: 'contact.tag_added' },
 	{ name: 'Contact Tag Removed', value: 'contact.tag_removed' },
 	{ name: 'Link Clicked', value: 'link.clicked' },
