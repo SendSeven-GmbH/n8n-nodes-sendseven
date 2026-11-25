@@ -654,6 +654,25 @@ export class SendSeven implements INodeType {
 				description: 'The message content to send',
 			},
 			{
+				displayName: 'Show Link Preview',
+				name: 'linkPreview',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['send'],
+					},
+				},
+				options: [
+					{ name: 'Channel Default', value: 'default' },
+					{ name: 'Yes', value: 'yes' },
+					{ name: 'No', value: 'no' },
+				],
+				default: 'default',
+				description:
+					'WhatsApp: shows a preview of the first link. Telegram: set to No to hide the preview. Ignored on other channels.',
+			},
+			{
 				displayName: 'Attachment IDs',
 				name: 'attachments',
 				type: 'string',
@@ -1756,6 +1775,11 @@ export class SendSeven implements INodeType {
 						const text = this.getNodeParameter('text', i) as string;
 
 						const body: IDataObject = { text };
+
+						const linkPreview = this.getNodeParameter('linkPreview', i, 'default') as string;
+						if (linkPreview === 'yes' || linkPreview === 'no') {
+							body.preview_url = linkPreview === 'yes';
+						}
 
 						const attachmentsRaw = this.getNodeParameter('attachments', i, '') as string;
 						if (attachmentsRaw) {

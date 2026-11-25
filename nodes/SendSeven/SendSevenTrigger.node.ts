@@ -16,6 +16,7 @@ import {
 	formatMessageResponse,
 	WEBHOOK_EVENTS,
 } from './GenericFunctions';
+import { verifyWebhookSignature } from './verifyWebhookSignature';
 
 /**
  * SendSeven WhatsApp & more Node
@@ -271,6 +272,34 @@ export class SendSevenTrigger implements INodeType {
 			};
 		}
 
+		// --- Authenticity check (fail closed) ---
+		// Every real delivery is HMAC-SHA256 signed with this webhook's secret_key.
+		// Reject anything unsigned, forged, stale (> 5 min) or from an activation
+		// that has no stored secret, BEFORE the workflow runs. Verified over the
+		// RAW bytes (n8n keeps them on req.rawBody), never re-serialized JSON.
+		const webhookData = this.getWorkflowStaticData('node');
+		const headerOf = (name: string): string | undefined => {
+			const v = req.headers[name];
+			return Array.isArray(v) ? v[0] : v;
+		};
+		const check = verifyWebhookSignature(
+			(req as unknown as { rawBody?: Buffer | string }).rawBody,
+			headerOf('x-sendseven-signature'),
+			headerOf('x-sendseven-timestamp'),
+			webhookData.secretKey as string | undefined,
+		);
+		if (!check.ok) {
+			const res = this.getResponseObject();
+			res.status(401).json({
+				error: 'Invalid SendSeven webhook signature',
+				hint:
+					check.reason === 'no signing secret stored for this webhook'
+						? 'Deactivate and re-activate the workflow to create a new signed subscription.'
+						: undefined,
+			});
+			return { noWebhookResponse: true };
+		}
+
 		// Validate event type matches.
 		// SendSeven's delivered webhook envelope keys the event on the top-level
 		// `type` field (NOT `event`). Falling back to `body.event` keeps the node
@@ -281,17 +310,6 @@ export class SendSevenTrigger implements INodeType {
 			return {
 				noWebhookResponse: true,
 			};
-		}
-
-		// Optional: Verify webhook signature
-		const webhookData = this.getWorkflowStaticData('node');
-		const secretKey = webhookData.secretKey as string;
-		if (secretKey) {
-			const signature = req.headers['x-sendseven-signature'] as string;
-			if (signature) {
-				// Note: In production, implement proper HMAC verification
-				// const isValid = verifySignature(body, signature, secretKey);
-			}
 		}
 
 		// Extract and format the data based on event type

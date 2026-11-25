@@ -115,6 +115,8 @@ Listen for real-time events:
 - **Campaign Sent**: Triggers when a campaign completes sending
 - **Team Chat Message Created**: Triggers when a bot- or human-authored message is posted to a Team Chat **channel** with "Allow Bots" enabled. Use the **Channel Filter** field (accepts a channel UUID or a name such as `#general`/`general`) to restrict the trigger to one channel; leave it blank to receive messages from every eligible channel. **Important:** Team Chat direct messages never trigger this node — SendSeven only publishes a webhook for channel messages, so there is no way to subscribe to DM events.
 
+**Security:** every delivery is verified with the webhook's signing secret (HMAC-SHA256 over `<timestamp>.<raw body>`). Requests without a valid signature, or older than 5 minutes, are answered with HTTP 401 and do not start the workflow.
+
 ## Authentication
 
 This node supports two authentication methods:
@@ -198,6 +200,11 @@ Different operations require different scopes:
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### 1.9.1 — Security: verify webhook signatures
+
+- SendSeven Trigger now verifies the `X-Sendseven-Signature` HMAC-SHA256 signature (over the raw request body and `X-Sendseven-Timestamp`) of every event and rejects unsigned, forged or older-than-5-minutes requests with HTTP 401 before the workflow runs. Previously the signature was stored but never checked, so anyone who knew a workflow's webhook URL could trigger it with fake events.
+- **Action required for workflows that are already active:** deactivate and re-activate them once (or just update the node, then re-activate). Activations that have no stored signing secret now answer 401 until re-activated.
 
 ### 1.7.0 — Tag events
 
